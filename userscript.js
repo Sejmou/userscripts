@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         oeticket event bookmarker
 // @namespace    http://tampermonkey.net/
-// @version      0.2
+// @version      0.2.1
 // @description  try to take over the world!
 // @author       Samo Kolter
 // @match        https://www.oeticket.com/*
@@ -65,11 +65,12 @@ class EventStore {
 
     #updateEventsInGMStorage() {
         GM_setValue(this.#eventsLabel, JSON.stringify(this.events));
+        console.log('events', this.events);
     }
 
     get eventFromCurrentPage() {
         const artistName = document.querySelector('.stage-headline')?.innerText;
-        const date = document.querySelector('time')?.innerText;
+        const [weekDay, date] = document.querySelector('time')?.innerText.split(',').map(str => str.trim());
         const venueEl = document.querySelector('a[href="#venueInformation"]');
         const venue = venueEl?.innerText;
 
@@ -87,6 +88,7 @@ class EventStore {
             id: eventId,
             link: eventLink,
             artistName,
+            weekDay,
             date,
             venue,
             address,
@@ -114,13 +116,11 @@ function createEventBookmarkButton() {
 
 
     evtBookmarkBtn.addEventListener('click', () => {
-        console.log('events before', eventsMap);
 
-        if (eventsMap.has(eventStore.eventFromCurrentPage.id)) eventStore.removeEvent(eventStore.eventFromCurrentPage.id);
-        else eventStore.addEvent(eventStore.eventFromCurrentPage.id);
+        if (eventStore.contains(eventStore.eventFromCurrentPage.id)) eventStore.removeEvent(eventStore.eventFromCurrentPage.id);
+        else eventStore.addEvent(eventStore.eventFromCurrentPage);
 
-        console.log('events after', eventsMap);
-        evtBookmarkBtn.innerText = eventsMap.has(eventStore.eventFromCurrentPage.id) ? 'remove event from bookmarks' : 'add event to bookmarks';
+        evtBookmarkBtn.innerText = eventStore.contains(eventStore.eventFromCurrentPage.id) ? 'remove event from bookmarks' : 'add event to bookmarks';
     });
 
     return evtBookmarkBtn;
@@ -183,6 +183,9 @@ function download(filename, text) {
 
 const eventStore = new EventStore();
 if (clearEventStore) eventStore.clear();
+
+//update event if it is already in bookmarks
+if (eventStore.contains(eventStore.eventFromCurrentPage.id)) eventStore.addEvent(eventStore.eventFromCurrentPage);
 
 if (eventStore.eventFromCurrentPage?.id) {
     if (autoAdd) eventStore.addEvent(eventStore.eventFromCurrentPage);
