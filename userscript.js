@@ -18,7 +18,7 @@
 const clearEventStore = false;
 
 //if true, automatically adds the event of the current page to the bookmarks as soon as the page loads
-const autoAdd = true;
+const autoAdd = false;
 
 
 
