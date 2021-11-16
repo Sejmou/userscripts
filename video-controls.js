@@ -10,8 +10,8 @@
 // ==/UserScript==
 
 //config
-videoSkipTimeSeconds = 5;
-videoPlaybackRateChange = 0.25;
+const videoSkipTimeSeconds = 5;
+const videoPlaybackRateChange = 0.25;
 
 
 
