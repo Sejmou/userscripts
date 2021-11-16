@@ -15,7 +15,7 @@ const videoPlaybackRateChange = 0.25;
 
 
 
-let video = document.querySelector('video');
+let video = document.querySelector('video'); 
 
 // create a new instance of `MutationObserver` named `observer`,
 // passing it a callback function
@@ -58,5 +58,22 @@ document.addEventListener('keydown', function (event) {
 
     if (event.key === '-') {
         video.playbackRate = Math.max(0.25, video.playbackRate - 0.25); 
+    }
+
+    if (event.key === 'f') {
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+            return;
+        }
+
+        if (video.requestFullscreen) {
+            video.requestFullscreen();
+        } else if (video.mozRequestFullScreen) {
+            video.mozRequestFullScreen();
+        } else if (video.webkitRequestFullscreen) {
+            video.webkitRequestFullscreen();
+        } else if (video.msRequestFullscreen) { 
+            video.msRequestFullscreen();
+        }
     }
 });
