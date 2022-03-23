@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Video Screenshot
 // @namespace    http://tampermonkey.net/
-// @version      0.1.1
+// @version      0.2
 // @description  Adds button that downloads a screenshot of the currently playing video as png
 // @author       You
 // @match        *://*/*
@@ -12,8 +12,50 @@
 // ==/UserScript==
 
 const video = document.querySelector('video');
+const videos = [];
 
 if (video) {
+  //video element available right away
+  addScreenshotButton(video);
+} else {
+  // listen to DOM changes, reacting accordingly if a video element is added
+  let videoFound = false;
+
+  const obs = new MutationObserver(mutations => {
+    mutations.forEach(m => {
+      const addedNodes = Array.from(m.addedNodes);
+      if (!videoFound) {
+        const video = addedNodes.find(n => findVideo(n));
+        if (video) {
+          if (!videos.find(v => v === video) && !(video.nodeName !== 'VIDEO')) {
+            // it is possible that we find the same video twice
+            // for some reason, sometimes also elements that aren't in fact videos are found
+            // either this is an error on my side or the elements really change their nodeName!?
+            alert('FOUND NEW VIDEO');
+            videos.push(video);
+            addScreenshotButton(video, videos);
+          }
+        }
+      }
+    });
+  });
+
+  obs.observe(document.body, { childList: true, subtree: true });
+}
+
+function findVideo(el) {
+  if (el.nodeName === 'VIDEO') {
+    return el;
+  }
+  return Array.from(el.childNodes).find(child => findVideo(child));
+}
+
+function addScreenshotButton(video) {
+  if (video.nodeName !== 'VIDEO') {
+    // for some reason, it is possible
+    return;
+  }
+
   const canvas = document.createElement('canvas');
   canvas.width = 1920;
   canvas.height = 1080;
@@ -54,7 +96,7 @@ function createButton() {
     position: fixed;
     top: 20px;
     left: 50%;
-    z-index: 999;
+    z-index: 2147483647 !important;/* make sure this button REALLY shows up */
     transition: 0.25s all;
     transform: translateX(-50%);
   }
