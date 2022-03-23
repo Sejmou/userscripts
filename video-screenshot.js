@@ -1,19 +1,17 @@
 // ==UserScript==
 // @name         Video Screenshot
 // @namespace    http://tampermonkey.net/
-// @version      0.1
+// @version      0.1.1
 // @description  Adds button that downloads a screenshot of the currently playing video as png
 // @author       You
 // @match        *://*/*
 // @icon         data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==
 // @grant        GM.setClipboard
+// @downloadURL  https://raw.githubusercontent.com/Sejmou/userscripts/master/video-screenshot.js
+// @updateURL    https://raw.githubusercontent.com/Sejmou/userscripts/master/video-screenshot.js
 // ==/UserScript==
 
 const video = document.querySelector('video');
-let image = 'test';
-
-const videos = document.querySelectorAll('video');
-console.log(videos);
 
 if (video) {
   const canvas = document.createElement('canvas');
@@ -23,8 +21,6 @@ if (video) {
   video.addEventListener('seeked', () => {
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    image = canvas.toDataURL('image/jpeg');
   });
 
   const btn = createButton();
