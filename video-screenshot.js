@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Video Screenshot
 // @namespace    http://tampermonkey.net/
-// @version      0.2
+// @version      0.2.1
 // @description  Adds button that downloads a screenshot of the currently playing video as png
 // @author       You
 // @match        *://*/*
@@ -31,7 +31,6 @@ if (video) {
             // it is possible that we find the same video twice
             // for some reason, sometimes also elements that aren't in fact videos are found
             // either this is an error on my side or the elements really change their nodeName!?
-            alert('FOUND NEW VIDEO');
             videos.push(video);
             addScreenshotButton(video, videos);
           }
