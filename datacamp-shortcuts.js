@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         DataCamp code editor shortcuts
 // @namespace    http://tampermonkey.net/
-// @version      0.1
-// @description  Adds keyboard shortcuts for use in DataCamp's R code editor
+// @version      0.2
+// @description  Adds keyboard shortcuts for use in DataCamp's R code editor + adds workaround for shortcuts overridden by Chrome shortcuts
 // @author       You
 // @include      *campus.datacamp.com*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=datacamp.com
@@ -17,86 +17,127 @@
 
 // There must be a smarter way to store key combinations and shortcuts, haven't found one yet, though :/
 class KeyCombination {
-  constructor(config = {}) {
-    this.code = config.code;
-    this.altKey = config.altKey;
+  constructor(keyboardEventInit = {}) {
+    Object.assign(this, keyboardEventInit);
   }
 
-  equals(other) {
-    return this.code === other.code && this.altKey === other.altKey;
+  equals(keyboardEvent) {
+    return (
+      this.code === keyboardEvent.code &&
+      this.altKey === keyboardEvent.altKey &&
+      this.ctrlKey === keyboardEvent.ctrlKey &&
+      this.shiftKey === keyboardEvent.shiftKey
+    );
   }
 }
 
-class ShortcutKeyCombination extends KeyCombination {
+class CustomShortcut extends KeyCombination {
   constructor(config = {}) {
     super(config);
     this.output = config.output;
   }
 }
 
+// Some DataCamp shortcuts are extremely "smart", e.g. ctrl + j for going to previous lesson
+// This shortcut doesn't work in Google Chrome as is, because per default, this opens the downloads
+// A simple way to fix this would have been to add preventDefault() in the keydown event listener, but apparently DataCamp's developers forgot about that
+// So, in essence this class just retriggers the key stroke
+class ShortcutWorkaround extends KeyCombination {
+  constructor(keyboardEventInit = {}) {
+    super(keyboardEventInit);
+    this.keyboardEvent = new KeyboardEvent('keydown', keyboardEventInit);
+  }
+
+  dispatchKeyboardEvent() {
+    const activeElement = document.activeElement;
+    document.body.focus();
+    document.body.dispatchEvent(this.keyboardEvent);
+    activeElement.focus();
+  }
+}
+
 const shortcuts = [
-  new ShortcutKeyCombination({ code: 'Slash', altKey: true, output: '<-' }),
-  new ShortcutKeyCombination({ code: 'Period', altKey: true, output: '%>%' }),
+  new CustomShortcut({ code: 'Slash', altKey: true, output: '<-' }),
+  new CustomShortcut({ code: 'Period', altKey: true, output: '%>%' }),
+];
+
+const shortcutWorkarounds = [
+  new ShortcutWorkaround({
+    // Ctrl + J
+    key: 'j',
+    code: 'KeyJ',
+    location: 0,
+    ctrlKey: true,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+    repeat: false,
+    isComposing: false,
+    charCode: 0,
+    keyCode: 74,
+    which: 74,
+    detail: 0,
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+  }),
+  new ShortcutWorkaround({
+    // Ctrl + K
+    key: 'k',
+    code: 'KeyK',
+    location: 0,
+    ctrlKey: true,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+    repeat: false,
+    isComposing: false,
+    charCode: 0,
+    keyCode: 75,
+    which: 75,
+    detail: 0,
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+  }),
 ];
 
 function getShortcutOutput(keyboardEvent) {
-  return shortcuts.find(s => s.equals(new KeyCombination(keyboardEvent)))
-    ?.output;
+  return shortcuts.find(s => s.equals(keyboardEvent))?.output;
 }
+
+function getShortcutWorkaround(keyboardEvent) {
+  return shortcutWorkarounds.find(s => s.equals(keyboardEvent));
+}
+
+const dispatchedEvents = [];
 
 function run() {
   document.body.addEventListener(
     'keydown',
     ev => {
-      const output = getShortcutOutput(ev);
+      if (!ev.isTrusted) {
+        console.log('Manually created event');
+        return;
+      }
 
-      if (output) {
-        GM.setClipboard(output);
+      const customShortcutOutput = getShortcutOutput(ev);
+      if (customShortcutOutput) {
+        GM.setClipboard(customShortcutOutput);
+        return;
+      }
+
+      const shortcutWorkaround = getShortcutWorkaround(ev);
+      console.log('workaround', shortcutWorkaround);
+      if (shortcutWorkaround) {
+        shortcutWorkaround.dispatchKeyboardEvent();
+        ev.preventDefault();
       }
     },
     {
       capture: true, // should increase probability that event listener is triggered
     }
   );
-  // my attempts at triggering a key press for the "A" key via script -> didn't work as explained above :/
-  // setTimeout(() => {
-  //   console.log('dispatching...');
-  //
-  //   const aKeyPressDict = {
-  //     key: 'a',
-  //     code: 'KeyA',
-  //     location: 0,
-  //     ctrlKey: false,
-  //     shiftKey: false,
-  //     altKey: false,
-  //     metaKey: false,
-  //     repeat: false,
-  //     isComposing: false,
-  //     charCode: 0,
-  //     keyCode: 65,
-  //     which: 65,
-  //     detail: 0,
-  //     bubbles: true,
-  //     cancelable: true,
-  //     composed: true,
-  //   };
-  //   const input = document.querySelector('.inputarea.monaco-mouse-cursor-text');
-  //   dispatchKeyboardEvent(aKeyPressDict, 'keydown', input);
-  //   dispatchKeyboardEvent(aKeyPressDict, 'keypress', input);
-  //   dispatchKeyboardEvent(aKeyPressDict, 'keyup', input);
-  //   dispatchKeyboardEvent(aKeyPressDict, 'keydown');
-  //   dispatchKeyboardEvent(aKeyPressDict, 'keypress');
-  //   dispatchKeyboardEvent(aKeyPressDict, 'keyup');
-  // }, 3000);
-}
-
-// unfortunately doesn't seem to work :/
-function dispatchKeyboardEvent(
-  keyboardEventInit,
-  type = 'keydown',
-  target = document.body
-) {
-  target.dispatchEvent(new KeyboardEvent(type, keyboardEventInit));
 }
 
 window.addEventListener('load', run, { once: true });
