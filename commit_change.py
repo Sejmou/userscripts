@@ -52,7 +52,7 @@ def main():
         )
 
     is_untracked = u_suff in selected_file
-    selected_file = selected_file.removesuffix(u_suff)
+    selected_file = re.sub(f"{u_suff}$", "", selected_file)
 
     file_version_str = ""
     with open(selected_file, "r") as f:
@@ -123,7 +123,8 @@ def main():
             file_content,
         )
 
-    commit_msg = f"{selected_file.removesuffix('.js')} v + {file_version}: {input('Commit message: ')}"
+    file_no_ext = re.sub("\.js$", "", selected_file)
+    commit_msg = f"{file_no_ext} v + {file_version}: {input('Commit message: ')}"
 
     with open(selected_file, "w") as f:
         f.write(file_content_updated_version)
