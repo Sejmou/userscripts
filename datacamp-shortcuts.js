@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DataCamp code editor shortcuts
 // @namespace    http://tampermonkey.net/
-// @version      0.3.1
+// @version      0.3.2
 // @description  Adds keyboard shortcuts for use in DataCamp's R code editor + adds workaround for shortcuts overridden by Chrome shortcuts
 // @author       You
 // @include      *campus.datacamp.com*
@@ -17,50 +17,6 @@
 // 2. ShortcutWorkaround: They essentially make DataCamp's built-in shortcuts work (for details see comments in/above class)
 
 // There may be a smarter way to store key combinations and shortcuts; If you know one, let me know lol
-// Feel free to add more
-const shortcuts = [
-  new EditorTypingShortcut({ code: 'Slash', altKey: true }, '<-'),
-  new EditorTypingShortcut({ code: 'Period', altKey: true }, '%>%'),
-  new ShortcutWorkaround({
-    // Ctrl + J
-    key: 'j',
-    code: 'KeyJ',
-    location: 0,
-    ctrlKey: true,
-    shiftKey: false,
-    altKey: false,
-    metaKey: false,
-    repeat: false,
-    isComposing: false,
-    charCode: 0,
-    keyCode: 74,
-    which: 74,
-    detail: 0,
-    bubbles: true,
-    cancelable: true,
-    composed: true,
-  }),
-  new ShortcutWorkaround({
-    // Ctrl + K
-    key: 'k',
-    code: 'KeyK',
-    location: 0,
-    ctrlKey: true,
-    shiftKey: false,
-    altKey: false,
-    metaKey: false,
-    repeat: false,
-    isComposing: false,
-    charCode: 0,
-    keyCode: 75,
-    which: 75,
-    detail: 0,
-    bubbles: true,
-    cancelable: true,
-    composed: true,
-  }),
-];
-
 class KeyCombination {
   constructor(keyboardEventInit = {}) {
     Object.assign(this, keyboardEventInit);
@@ -176,6 +132,50 @@ class ShortcutWorkaround extends KeyboardShortcut {
     keyboardEvent.preventDefault();
   }
 }
+
+// Feel free to add more
+const shortcuts = [
+  new EditorTypingShortcut({ code: 'Slash', altKey: true }, '<-'),
+  new EditorTypingShortcut({ code: 'Period', altKey: true }, '%>%'),
+  new ShortcutWorkaround({
+    // Ctrl + J
+    key: 'j',
+    code: 'KeyJ',
+    location: 0,
+    ctrlKey: true,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+    repeat: false,
+    isComposing: false,
+    charCode: 0,
+    keyCode: 74,
+    which: 74,
+    detail: 0,
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+  }),
+  new ShortcutWorkaround({
+    // Ctrl + K
+    key: 'k',
+    code: 'KeyK',
+    location: 0,
+    ctrlKey: true,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+    repeat: false,
+    isComposing: false,
+    charCode: 0,
+    keyCode: 75,
+    which: 75,
+    detail: 0,
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+  }),
+];
 
 function applyKeyboardShortcutIfMatching(keyboardEvent) {
   return shortcuts.find(s => s.handle(keyboardEvent));
