@@ -52,7 +52,9 @@ def main():
         )
 
     is_untracked = u_suff in selected_file
-    selected_file = re.sub(f"{u_suff}$", "", selected_file)
+
+    if selected_file.endswith(u_suff):
+        selected_file = selected_file[: -len(u_suff)]
 
     file_version_str = ""
     with open(selected_file, "r") as f:
