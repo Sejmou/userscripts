@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DataCamp code editor shortcuts
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.3.1
 // @description  Adds keyboard shortcuts for use in DataCamp's R code editor + adds workaround for shortcuts overridden by Chrome shortcuts
 // @author       You
 // @include      *campus.datacamp.com*
@@ -9,13 +9,58 @@
 // @grant        GM.setClipboard
 // ==/UserScript==
 
-// Usage: press shortcut for required symbol, it will then be pasted to your clipboard and you just have to do ctrl + v to insert the symbol
-// Unfortunately, direct pasting from the script is not possible due to security restrictions on the JavaScript Clipboard API :/
-// I even tried to dispatch KeyboardEvents, but they seem to be ignored (at least by the Monaco Editor used on DataCamp)
-// This is most probably due to the isTrusted prop being false for KeyboardEvents generated from scripts (the property can only be true for user-generated actions)
-// Possible alternative: Writing a Python script and using something like PyAutoGUI; Python has lower-level system access, contrary to browser
+// Two types of shortcuts are supported by this script:
+// 1. EditorTypingShortcuts: Paste any given string to the clipboard
+//      Usage: press shortcut for required symbol, it will then be pasted to your clipboard and you just have to do ctrl + v to insert the symbol
+//      Unfortunately, direct pasting from the script is not possible due to security restrictions on the JavaScript Clipboard API :/
+//
+// 2. ShortcutWorkaround: They essentially make DataCamp's built-in shortcuts work (for details see comments in/above class)
 
 // There may be a smarter way to store key combinations and shortcuts; If you know one, let me know lol
+// Feel free to add more
+const shortcuts = [
+  new EditorTypingShortcut({ code: 'Slash', altKey: true }, '<-'),
+  new EditorTypingShortcut({ code: 'Period', altKey: true }, '%>%'),
+  new ShortcutWorkaround({
+    // Ctrl + J
+    key: 'j',
+    code: 'KeyJ',
+    location: 0,
+    ctrlKey: true,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+    repeat: false,
+    isComposing: false,
+    charCode: 0,
+    keyCode: 74,
+    which: 74,
+    detail: 0,
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+  }),
+  new ShortcutWorkaround({
+    // Ctrl + K
+    key: 'k',
+    code: 'KeyK',
+    location: 0,
+    ctrlKey: true,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+    repeat: false,
+    isComposing: false,
+    charCode: 0,
+    keyCode: 75,
+    which: 75,
+    detail: 0,
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+  }),
+];
+
 class KeyCombination {
   constructor(keyboardEventInit = {}) {
     Object.assign(this, keyboardEventInit);
@@ -132,54 +177,9 @@ class ShortcutWorkaround extends KeyboardShortcut {
   }
 }
 
-const shortcuts = [
-  new EditorTypingShortcut({ code: 'Slash', altKey: true }, '<-'),
-  new EditorTypingShortcut({ code: 'Period', altKey: true }, '%>%'),
-  new ShortcutWorkaround({
-    // Ctrl + J
-    key: 'j',
-    code: 'KeyJ',
-    location: 0,
-    ctrlKey: true,
-    shiftKey: false,
-    altKey: false,
-    metaKey: false,
-    repeat: false,
-    isComposing: false,
-    charCode: 0,
-    keyCode: 74,
-    which: 74,
-    detail: 0,
-    bubbles: true,
-    cancelable: true,
-    composed: true,
-  }),
-  new ShortcutWorkaround({
-    // Ctrl + K
-    key: 'k',
-    code: 'KeyK',
-    location: 0,
-    ctrlKey: true,
-    shiftKey: false,
-    altKey: false,
-    metaKey: false,
-    repeat: false,
-    isComposing: false,
-    charCode: 0,
-    keyCode: 75,
-    which: 75,
-    detail: 0,
-    bubbles: true,
-    cancelable: true,
-    composed: true,
-  }),
-];
-
 function applyKeyboardShortcutIfMatching(keyboardEvent) {
   return shortcuts.find(s => s.handle(keyboardEvent));
 }
-
-const dispatchedEvents = [];
 
 function run() {
   document.body.addEventListener(
