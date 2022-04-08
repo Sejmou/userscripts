@@ -9,9 +9,12 @@
 // @grant        GM.setClipboard
 // ==/UserScript==
 
-// Usage note: Click button created by the script to activate the keyboard listener
+// Usage: Click button created by the script to activate the keyboard listener
 // The KeyboardEventInit() params for each 'keydown' event on document.body are then copied to the clipboard
 // click the button again to stop listening
+// while listening, the KeyboardEventInit required to reproduce each keystroke is also logged to the console
+// Note that one cannot completely reproduce KeyboardEvents using newKeyboardEvent(type, keyboardEventInit), as the isTrusted property is often important
+// One cannot set this manually, only real key strokes have this property set to true
 
 function run() {
   const btnId = 'keyboardeventinit-extractor-btn';
