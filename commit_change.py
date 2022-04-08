@@ -124,7 +124,7 @@ def main():
         )
 
     file_no_ext = re.sub("\.js$", "", selected_file)
-    commit_msg = f"{file_no_ext} v + {file_version}: {input('Commit message: ')}"
+    commit_msg = f"{file_no_ext} v {file_version}: {input('Commit message: ')}"
 
     with open(selected_file, "w") as f:
         f.write(file_content_updated_version)
