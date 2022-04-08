@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DataCamp code editor shortcuts
 // @namespace    http://tampermonkey.net/
-// @version      0.3.2
+// @version      0.3.3
 // @description  Adds keyboard shortcuts for use in DataCamp's R code editor + adds workaround for shortcuts overridden by Chrome shortcuts
 // @author       You
 // @include      *campus.datacamp.com*
@@ -137,6 +137,7 @@ class ShortcutWorkaround extends KeyboardShortcut {
 const shortcuts = [
   new EditorTypingShortcut({ code: 'Slash', altKey: true }, '<-'),
   new EditorTypingShortcut({ code: 'Period', altKey: true }, '%>%'),
+  new EditorTypingShortcut({ code: 'KeyI', altKey: true }, '%in%'),
   new ShortcutWorkaround({
     // Ctrl + J
     key: 'j',
@@ -170,6 +171,24 @@ const shortcuts = [
     charCode: 0,
     keyCode: 75,
     which: 75,
+    detail: 0,
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+  }),
+  new ShortcutWorkaround({
+    key: 'o',
+    code: 'KeyO',
+    location: 0,
+    ctrlKey: true,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+    repeat: false,
+    isComposing: false,
+    charCode: 0,
+    keyCode: 79,
+    which: 79,
     detail: 0,
     bubbles: true,
     cancelable: true,
