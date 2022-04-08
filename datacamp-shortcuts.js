@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DataCamp code editor shortcuts
 // @namespace    http://tampermonkey.net/
-// @version      0.4
+// @version      0.4.5
 // @description  Adds keyboard shortcuts for use in DataCamp's R code editor + adds workaround for shortcuts overridden by Chrome shortcuts
 // @author       You
 // @include      *campus.datacamp.com*
@@ -18,7 +18,13 @@
 
 // There may be a smarter way to store key combinations and shortcuts; If you know one, let me know lol
 class KeyCombination {
-  constructor(keyboardEventInit = {}) {
+  constructor(keyboardEventInit) {
+    // set defaults
+    this.altKey = false;
+    this.ctrlKey = false;
+    this.shiftKey = false;
+    this.metaKey = false;
+    // override with values defined in keyboardEventInit
     Object.assign(this, keyboardEventInit);
   }
 
@@ -130,8 +136,14 @@ class FunctionShortcut extends KeyboardShortcut {
 // A simple way to fix this would have been to add preventDefault() in the keydown event listener, but apparently DataCamp's developers forgot about that
 // In essence, this class just retriggers the key combination provided via keyBoardEventInit on document.body
 class ShortcutWorkaround extends KeyboardShortcut {
-  constructor(keyboardEventInit) {
-    super(keyboardEventInit, keyboardEventInit); // both the handled and dispatched keyboardEvent are practically the same lol
+  constructor(origKbEvtInit, remapKbEvtInit = null) {
+    if (!remapKbEvtInit) {
+      // both the handled and dispatched KeyboardEvent are practically the same
+      super(origKbEvtInit, origKbEvtInit);
+    } else {
+      // We want to trigger different KeyboardEvent when user hits key combination -> remap
+      super(origKbEvtInit, remapKbEvtInit);
+    }
   }
 
   apply() {
@@ -207,6 +219,16 @@ const shortcuts = [
     cancelable: true,
     composed: true,
   }),
+  new ShortcutWorkaround(
+    // Hitting Enter at end of exercise never works (despite message being shown)
+    {
+      code: 'Enter',
+      altKey: true,
+    },
+    () => {
+      document.querySelector('.dc-completed__continue button').click();
+    }
+  ),
   new FunctionShortcut(
     {
       key: 'Escape',
