@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DataCamp code editor shortcuts
 // @namespace    http://tampermonkey.net/
-// @version      0.3.3
+// @version      0.4
 // @description  Adds keyboard shortcuts for use in DataCamp's R code editor + adds workaround for shortcuts overridden by Chrome shortcuts
 // @author       You
 // @include      *campus.datacamp.com*
@@ -39,14 +39,15 @@ class KeyboardShortcut {
   // accept two different KeyboardEventInit objects as input, each serving different purpose:
   // 1. for creating the KeyCombination instance that is used for detecting whether a given key combination (KeyboardEvent) should be handled by the shortcut
   // 2. for setting up the keyboard event(s) that should be triggered by the shortcut
-  constructor(kbComboKbEvtInit, dispatchedKbEvtInit) {
+  constructor(kbComboKbEvtInit, dispatchedKbEvtInit = null) {
     if (new.target === KeyboardShortcut) {
       throw new TypeError(
         'KeyboardShortcut class is abstract, cannot instantiate directly!'
       );
     }
     this.keyCombination = new KeyCombination(kbComboKbEvtInit);
-    this.keyboardEvent = new KeyboardEvent('keydown', dispatchedKbEvtInit);
+    if (dispatchedKbEvtInit)
+      this.keyboardEvent = new KeyboardEvent('keydown', dispatchedKbEvtInit);
   }
 
   handle(keyboardEvent) {
@@ -109,6 +110,18 @@ class EditorTypingShortcut extends KeyboardShortcut {
     // the isTrusted property of the manually created keyboard Event could be the issue
     //  if the Monaco code editor checks for this prop, there's not much we can do I guess :/
     activeElement.dispatchEvent(this.keyboardEvent);
+  }
+}
+
+// allows running an arbitrary function by pressing a shortcut
+class FunctionShortcut extends KeyboardShortcut {
+  constructor(kbEvtInit, fn) {
+    super(kbEvtInit);
+    this.fn = fn;
+  }
+
+  apply() {
+    this.fn();
   }
 }
 
@@ -194,6 +207,28 @@ const shortcuts = [
     cancelable: true,
     composed: true,
   }),
+  new FunctionShortcut(
+    {
+      key: 'Escape',
+      code: 'Escape',
+      location: 0,
+      ctrlKey: false,
+      shiftKey: false,
+      altKey: false,
+      metaKey: false,
+      repeat: false,
+      isComposing: false,
+      charCode: 0,
+      keyCode: 27,
+      which: 27,
+      detail: 0,
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+    },
+    // closes modal that opens after hitting Ctrl + O
+    () => document.querySelector('.modal-overlay')?.click()
+  ),
 ];
 
 function applyKeyboardShortcutIfMatching(keyboardEvent) {
