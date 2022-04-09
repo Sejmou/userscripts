@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DataCamp code editor shortcuts
 // @namespace    http://tampermonkey.net/
-// @version      0.6
+// @version      0.7
 // @description  Adds keyboard shortcuts for use in DataCamp's R code editor + adds workaround for shortcuts overridden by Chrome shortcuts
 // @author       You
 // @include      *.datacamp.com*
@@ -182,12 +182,6 @@ class ShortcutWorkaround extends KeyboardShortcut {
   }
 }
 
-// TODO: refactor - replace the following ID declarations
-// relevant for functionality of esc key shortcut (leave video iframe)
-const escKeyPressFromIframeGMValueId = 'escFromIframe';
-// relevant for functionfality of f key shortcut (focus into video)
-const fKeyPressFromVideoPageGMValueId = 'fFromVideoPage';
-
 function createShortcuts() {
   // Feel free to add more
   return new KeyboardShortcuts([
@@ -284,9 +278,8 @@ function createShortcuts() {
       () => {
         const currentPage = getCurrentPage();
         if (currentPage === 'video-iframe') {
-          console.log(document.activeElement);
           document.activeElement.blur();
-          GM.setValue(escKeyPressFromIframeGMValueId, Math.random());
+          ScriptMessaging.notify(notificationIds.escKeyPressFromVideoIframe);
         } else {
           // closes modal that opens after hitting Ctrl + O (in case it is open)
           document.querySelector('.modal-overlay')?.click();
@@ -319,13 +312,61 @@ function createShortcuts() {
           )?.contentWindow; // contentWindow of iframe video is running in
           videoIframeWindow?.focus();
 
-          // use this hack to notify script instance running in iframe that it should focus the video player
-          GM.setValue(fKeyPressFromVideoPageGMValueId, Math.random());
+          // notify script instance running in iframe that it should focus the video player
+          ScriptMessaging.notify(notificationIds.fKeyPressFromVideoPage);
         }
       }
     ),
   ]);
 }
+
+// The following class tries to mimick Window.postMessage(), but for use with GM script instances
+// See also https://stackoverflow.com/a/47880285/13727176 and https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage
+class ScriptMessaging {
+  static #LAST_MESSAGE_SUFFIX = '_last-message-sent-at';
+  static #LAST_VALUE_CHANGE_SUFFIX = '_last-value-change-at';
+  static trackedMessageLabels = new Set(); // populated with message labels as messages are sent
+
+  static onMessage(label, callback, onlyIfMsgChanged = true) {
+    if (onlyIfMsgChanged) {
+      GM.addValueChangeListener(label, (label, oldValue, newValue) =>
+        callback(newValue)
+      );
+    } else {
+      const lastMessageLabel = label + this.#LAST_MESSAGE_SUFFIX;
+      GM.addValueChangeListener(lastMessageLabel, async () =>
+        callback(await GM.getValue(label))
+      );
+    }
+  }
+
+  static sendMessage(label, content) {
+    GM.setValue(label, content);
+
+    const lastChangeLabel = label + this.#LAST_VALUE_CHANGE_SUFFIX;
+    const lastMessageLabel = label + this.#LAST_MESSAGE_SUFFIX;
+    if (!this.trackedMessageLabels.has(label)) {
+      this.trackedMessageLabels.add(label);
+      GM.addValueChangeListener(label, (label, oldValue, newValue) => {
+        GM.setValue(lastChangeLabel, Date.now());
+      });
+    }
+    GM.setValue(lastMessageLabel, Date.now());
+  }
+
+  static notify(notificationId) {
+    this.sendMessage(notificationId, Math.random());
+  }
+
+  static onNotify(notificationId, callback) {
+    GM.addValueChangeListener(notificationId, callback);
+  }
+}
+
+const notificationIds = {
+  fKeyPressFromVideoPage: 'f-key-video-page',
+  escKeyPressFromVideoIframe: 'esc-key-video-iframe',
+};
 
 function run() {
   const shortcuts = createShortcuts();
@@ -333,15 +374,39 @@ function run() {
 
   if (currentPage === 'video-iframe') {
     const videoPlayer = document.activeElement;
-    GM.addValueChangeListener(fKeyPressFromVideoPageGMValueId, () =>
+    ScriptMessaging.onNotify(notificationIds.fKeyPressFromVideoPage, () =>
       videoPlayer.focus()
     );
+
+    // TODO: DEMO: remove later
+    let value = true;
+    let i = 0;
+    setInterval(() => {
+      if (i % 3 === 0) {
+        value = !value;
+      }
+      i++;
+      console.log('sending message from iframe:', value);
+      ScriptMessaging.sendMessage('test', value);
+    }, 1000);
   } else {
-    GM.addValueChangeListener(escKeyPressFromIframeGMValueId, () => {
+    ScriptMessaging.onNotify(notificationIds.escKeyPressFromVideoIframe, () => {
       // remove focus for video in iframe -> focus is back in main document
       // regular DataCamp keyboard shortcuts work again
       document.activeElement.blur();
     });
+
+    // TODO: DEMO: remove later
+    ScriptMessaging.onMessage('test', newVal => {
+      console.log('   main document "only change" listener received:', newVal);
+    });
+    ScriptMessaging.onMessage(
+      'test',
+      val => {
+        console.log('   main document "every message" listener received:', val);
+      },
+      false
+    );
   }
 
   document.body.addEventListener(
@@ -351,7 +416,6 @@ function run() {
         // we're dealing with a manually created event -> probably one we dispatched ourselves!
         return;
       }
-
       shortcuts.applyMatching(ev);
     },
     {
