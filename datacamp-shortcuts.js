@@ -1,12 +1,15 @@
 // ==UserScript==
 // @name         DataCamp code editor shortcuts
 // @namespace    http://tampermonkey.net/
-// @version      0.4.5
+// @version      0.5
 // @description  Adds keyboard shortcuts for use in DataCamp's R code editor + adds workaround for shortcuts overridden by Chrome shortcuts
 // @author       You
-// @include      *campus.datacamp.com*
+// @include      *.datacamp.com*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=datacamp.com
 // @grant        GM.setClipboard
+// @grant        GM.setValue
+// @grant        GM.getValue
+// @grant        GM.addValueChangeListener
 // ==/UserScript==
 
 // Two types of shortcuts are supported by this script:
@@ -158,6 +161,11 @@ class ShortcutWorkaround extends KeyboardShortcut {
   }
 }
 
+// relevant for functionality of esc key shortcut
+const escFromIframeGMValueId = 'escFromIframe';
+
+const insideVideoIframe = !!document.querySelector('.slides');
+
 // Feel free to add more
 const shortcuts = [
   new EditorTypingShortcut({ code: 'Slash', altKey: true }, '<-'),
@@ -248,8 +256,16 @@ const shortcuts = [
       cancelable: true,
       composed: true,
     },
-    // closes modal that opens after hitting Ctrl + O
-    () => document.querySelector('.modal-overlay')?.click()
+
+    () => {
+      if (insideVideoIframe) {
+        document.activeElement.blur();
+        GM.setValue(escFromIframeGMValueId, Math.random());
+      } else {
+        // closes modal that opens after hitting Ctrl + O (in case it is open)
+        document.querySelector('.modal-overlay')?.click();
+      }
+    }
   ),
 ];
 
@@ -258,6 +274,14 @@ function applyKeyboardShortcutIfMatching(keyboardEvent) {
 }
 
 function run() {
+  if (!insideVideoIframe) {
+    GM.addValueChangeListener(escFromIframeGMValueId, () => {
+      // remove focus for video in iframe -> focus is back in main document
+      // regular DataCamp keyboard shortcuts work again
+      document.activeElement.blur();
+    });
+  }
+
   document.body.addEventListener(
     'keydown',
     ev => {
