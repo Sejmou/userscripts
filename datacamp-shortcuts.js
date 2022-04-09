@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DataCamp code editor shortcuts
 // @namespace    http://tampermonkey.net/
-// @version      0.5.5
+// @version      0.6
 // @description  Adds keyboard shortcuts for use in DataCamp's R code editor + adds workaround for shortcuts overridden by Chrome shortcuts
 // @author       You
 // @include      *.datacamp.com*
@@ -182,8 +182,11 @@ class ShortcutWorkaround extends KeyboardShortcut {
   }
 }
 
-// relevant for functionality of esc key shortcut
-const escFromIframeGMValueId = 'escFromIframe';
+// TODO: refactor - replace the following ID declarations
+// relevant for functionality of esc key shortcut (leave video iframe)
+const escKeyPressFromIframeGMValueId = 'escFromIframe';
+// relevant for functionfality of f key shortcut (focus into video)
+const fKeyPressFromVideoPageGMValueId = 'fFromVideoPage';
 
 function createShortcuts() {
   // Feel free to add more
@@ -254,7 +257,7 @@ function createShortcuts() {
         altKey: true,
       },
       () => {
-        document.querySelector('.dc-completed__continue button').click();
+        document.querySelector('.dc-completed__continue button')?.click();
       }
     ),
     // TODO: maybe add class for shortcuts that only apply to certain page?
@@ -278,15 +281,46 @@ function createShortcuts() {
         cancelable: true,
         composed: true,
       },
-
       () => {
         const currentPage = getCurrentPage();
         if (currentPage === 'video-iframe') {
+          console.log(document.activeElement);
           document.activeElement.blur();
-          GM.setValue(escFromIframeGMValueId, Math.random());
+          GM.setValue(escKeyPressFromIframeGMValueId, Math.random());
         } else {
           // closes modal that opens after hitting Ctrl + O (in case it is open)
           document.querySelector('.modal-overlay')?.click();
+        }
+      }
+    ),
+    new FunctionShortcut(
+      {
+        key: 'f',
+        code: 'KeyF',
+        location: 0,
+        ctrlKey: false,
+        shiftKey: false,
+        altKey: false,
+        metaKey: false,
+        repeat: false,
+        isComposing: false,
+        charCode: 0,
+        keyCode: 70,
+        which: 70,
+        detail: 0,
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+      },
+      () => {
+        if (getCurrentPage() === 'video-page') {
+          const videoIframeWindow = document.querySelector(
+            'iframe[title*="video"]'
+          )?.contentWindow; // contentWindow of iframe video is running in
+          videoIframeWindow?.focus();
+
+          // use this hack to notify script instance running in iframe that it should focus the video player
+          GM.setValue(fKeyPressFromVideoPageGMValueId, Math.random());
         }
       }
     ),
@@ -297,8 +331,13 @@ function run() {
   const shortcuts = createShortcuts();
   const currentPage = getCurrentPage();
 
-  if (currentPage !== 'video-iframe') {
-    GM.addValueChangeListener(escFromIframeGMValueId, () => {
+  if (currentPage === 'video-iframe') {
+    const videoPlayer = document.activeElement;
+    GM.addValueChangeListener(fKeyPressFromVideoPageGMValueId, () =>
+      videoPlayer.focus()
+    );
+  } else {
+    GM.addValueChangeListener(escKeyPressFromIframeGMValueId, () => {
       // remove focus for video in iframe -> focus is back in main document
       // regular DataCamp keyboard shortcuts work again
       document.activeElement.blur();
