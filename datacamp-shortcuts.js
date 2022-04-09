@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DataCamp code editor shortcuts
 // @namespace    http://tampermonkey.net/
-// @version      0.5
+// @version      0.5.5
 // @description  Adds keyboard shortcuts for use in DataCamp's R code editor + adds workaround for shortcuts overridden by Chrome shortcuts
 // @author       You
 // @include      *.datacamp.com*
@@ -134,6 +134,27 @@ class FunctionShortcut extends KeyboardShortcut {
   }
 }
 
+// Stores a collection of KeyboardShortcuts; can be used to find and apply shortcuts
+class KeyboardShortcuts {
+  // shortcuts should be an array of KeyboardShortcut objects
+  // TODO: add logic for checking if multiple shortcuts listen for same KeyCombination
+  constructor(shortcuts) {
+    this.shortcuts = shortcuts;
+  }
+
+  // applies a shortcut if it matches
+  // TODO: think about whether multiple shortcut bindings for same keyboard combination should be allowed
+  // If yes, current solution wouldn't work
+  applyMatching(keyboardEvent) {
+    return this.shortcuts.find(s => s.handle(keyboardEvent));
+  }
+
+  // TODO: add logic for checking if keybinding for KeyCombination of shortcut already exists
+  add(shortcut) {
+    this.shortcuts.push(shortcut);
+  }
+}
+
 // Some DataCamp shortcuts are not "well-chosen", e.g. ctrl + j for going to previous lesson
 // This shortcut doesn't work in Google Chrome as is, because per default, this opens the downloads
 // A simple way to fix this would have been to add preventDefault() in the keydown event listener, but apparently DataCamp's developers forgot about that
@@ -164,117 +185,119 @@ class ShortcutWorkaround extends KeyboardShortcut {
 // relevant for functionality of esc key shortcut
 const escFromIframeGMValueId = 'escFromIframe';
 
-const insideVideoIframe = !!document.querySelector('.slides');
-
-// Feel free to add more
-const shortcuts = [
-  new EditorTypingShortcut({ code: 'Slash', altKey: true }, '<-'),
-  new EditorTypingShortcut({ code: 'Period', altKey: true }, '%>%'),
-  new EditorTypingShortcut({ code: 'KeyI', altKey: true }, '%in%'),
-  new ShortcutWorkaround({
-    // Ctrl + J
-    key: 'j',
-    code: 'KeyJ',
-    location: 0,
-    ctrlKey: true,
-    shiftKey: false,
-    altKey: false,
-    metaKey: false,
-    repeat: false,
-    isComposing: false,
-    charCode: 0,
-    keyCode: 74,
-    which: 74,
-    detail: 0,
-    bubbles: true,
-    cancelable: true,
-    composed: true,
-  }),
-  new ShortcutWorkaround({
-    // Ctrl + K
-    key: 'k',
-    code: 'KeyK',
-    location: 0,
-    ctrlKey: true,
-    shiftKey: false,
-    altKey: false,
-    metaKey: false,
-    repeat: false,
-    isComposing: false,
-    charCode: 0,
-    keyCode: 75,
-    which: 75,
-    detail: 0,
-    bubbles: true,
-    cancelable: true,
-    composed: true,
-  }),
-  new ShortcutWorkaround({
-    key: 'o',
-    code: 'KeyO',
-    location: 0,
-    ctrlKey: true,
-    shiftKey: false,
-    altKey: false,
-    metaKey: false,
-    repeat: false,
-    isComposing: false,
-    charCode: 0,
-    keyCode: 79,
-    which: 79,
-    detail: 0,
-    bubbles: true,
-    cancelable: true,
-    composed: true,
-  }),
-  new ShortcutWorkaround(
-    // Hitting Enter at end of exercise never works (despite message being shown)
-    {
-      code: 'Enter',
-      altKey: true,
-    },
-    () => {
-      document.querySelector('.dc-completed__continue button').click();
-    }
-  ),
-  new FunctionShortcut(
-    {
-      key: 'Escape',
-      code: 'Escape',
+function createShortcuts() {
+  // Feel free to add more
+  return new KeyboardShortcuts([
+    new EditorTypingShortcut({ code: 'Slash', altKey: true }, '<-'),
+    new EditorTypingShortcut({ code: 'Period', altKey: true }, '%>%'),
+    new EditorTypingShortcut({ code: 'KeyI', altKey: true }, '%in%'),
+    new ShortcutWorkaround({
+      // Ctrl + J
+      key: 'j',
+      code: 'KeyJ',
       location: 0,
-      ctrlKey: false,
+      ctrlKey: true,
       shiftKey: false,
       altKey: false,
       metaKey: false,
       repeat: false,
       isComposing: false,
       charCode: 0,
-      keyCode: 27,
-      which: 27,
+      keyCode: 74,
+      which: 74,
       detail: 0,
       bubbles: true,
       cancelable: true,
       composed: true,
-    },
-
-    () => {
-      if (insideVideoIframe) {
-        document.activeElement.blur();
-        GM.setValue(escFromIframeGMValueId, Math.random());
-      } else {
-        // closes modal that opens after hitting Ctrl + O (in case it is open)
-        document.querySelector('.modal-overlay')?.click();
+    }),
+    new ShortcutWorkaround({
+      // Ctrl + K
+      key: 'k',
+      code: 'KeyK',
+      location: 0,
+      ctrlKey: true,
+      shiftKey: false,
+      altKey: false,
+      metaKey: false,
+      repeat: false,
+      isComposing: false,
+      charCode: 0,
+      keyCode: 75,
+      which: 75,
+      detail: 0,
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+    }),
+    new ShortcutWorkaround({
+      key: 'o',
+      code: 'KeyO',
+      location: 0,
+      ctrlKey: true,
+      shiftKey: false,
+      altKey: false,
+      metaKey: false,
+      repeat: false,
+      isComposing: false,
+      charCode: 0,
+      keyCode: 79,
+      which: 79,
+      detail: 0,
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+    }),
+    new ShortcutWorkaround(
+      // Hitting Enter at end of exercise never works (despite message being shown)
+      {
+        code: 'Enter',
+        altKey: true,
+      },
+      () => {
+        document.querySelector('.dc-completed__continue button').click();
       }
-    }
-  ),
-];
+    ),
+    // TODO: maybe add class for shortcuts that only apply to certain page?
+    // Note: Would probably require change in KeyboardShortcuts (applyMatching()!), too
+    new FunctionShortcut(
+      {
+        key: 'Escape',
+        code: 'Escape',
+        location: 0,
+        ctrlKey: false,
+        shiftKey: false,
+        altKey: false,
+        metaKey: false,
+        repeat: false,
+        isComposing: false,
+        charCode: 0,
+        keyCode: 27,
+        which: 27,
+        detail: 0,
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+      },
 
-function applyKeyboardShortcutIfMatching(keyboardEvent) {
-  return shortcuts.find(s => s.handle(keyboardEvent));
+      () => {
+        const currentPage = getCurrentPage();
+        if (currentPage === 'video-iframe') {
+          document.activeElement.blur();
+          GM.setValue(escFromIframeGMValueId, Math.random());
+        } else {
+          // closes modal that opens after hitting Ctrl + O (in case it is open)
+          document.querySelector('.modal-overlay')?.click();
+        }
+      }
+    ),
+  ]);
 }
 
 function run() {
-  if (!insideVideoIframe) {
+  const shortcuts = createShortcuts();
+  const currentPage = getCurrentPage();
+
+  if (currentPage !== 'video-iframe') {
     GM.addValueChangeListener(escFromIframeGMValueId, () => {
       // remove focus for video in iframe -> focus is back in main document
       // regular DataCamp keyboard shortcuts work again
@@ -290,12 +313,25 @@ function run() {
         return;
       }
 
-      applyKeyboardShortcutIfMatching(ev);
+      shortcuts.applyMatching(ev);
     },
     {
       capture: true, // should increase probability that event listener is triggered
     }
   );
+}
+
+function getCurrentPage() {
+  if (document.querySelector('.slides')) {
+    return 'video-iframe'; // inside video iframe
+  } else if (
+    // only true if video already loaded, while video is still loading, this is not available
+    document.querySelector('[data-cy*="video-exercise"]')
+  ) {
+    return 'video-page';
+  } else {
+    return 'other';
+  }
 }
 
 window.addEventListener('load', run, { once: true });
