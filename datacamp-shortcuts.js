@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DataCamp code editor shortcuts
 // @namespace    http://tampermonkey.net/
-// @version      0.7
+// @version      0.7.1
 // @description  Adds keyboard shortcuts for use in DataCamp's R code editor + adds workaround for shortcuts overridden by Chrome shortcuts
 // @author       You
 // @include      *.datacamp.com*
@@ -347,7 +347,7 @@ class ScriptMessaging {
     const lastMessageLabel = label + this.#LAST_MESSAGE_SUFFIX;
     if (!this.trackedMessageLabels.has(label)) {
       this.trackedMessageLabels.add(label);
-      GM.addValueChangeListener(label, (label, oldValue, newValue) => {
+      GM.addValueChangeListener(label, () => {
         GM.setValue(lastChangeLabel, Date.now());
       });
     }
@@ -377,36 +377,12 @@ function run() {
     ScriptMessaging.onNotify(notificationIds.fKeyPressFromVideoPage, () =>
       videoPlayer.focus()
     );
-
-    // TODO: DEMO: remove later
-    let value = true;
-    let i = 0;
-    setInterval(() => {
-      if (i % 3 === 0) {
-        value = !value;
-      }
-      i++;
-      console.log('sending message from iframe:', value);
-      ScriptMessaging.sendMessage('test', value);
-    }, 1000);
   } else {
     ScriptMessaging.onNotify(notificationIds.escKeyPressFromVideoIframe, () => {
       // remove focus for video in iframe -> focus is back in main document
       // regular DataCamp keyboard shortcuts work again
       document.activeElement.blur();
     });
-
-    // TODO: DEMO: remove later
-    ScriptMessaging.onMessage('test', newVal => {
-      console.log('   main document "only change" listener received:', newVal);
-    });
-    ScriptMessaging.onMessage(
-      'test',
-      val => {
-        console.log('   main document "every message" listener received:', val);
-      },
-      false
-    );
   }
 
   document.body.addEventListener(
