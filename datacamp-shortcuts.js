@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DataCamp code editor shortcuts
 // @namespace    http://tampermonkey.net/
-// @version      0.7.5
+// @version      0.8
 // @description  Adds keyboard shortcuts for use in DataCamp's R code editor + adds workaround for shortcuts overridden by Chrome shortcuts
 // @author       You
 // @include      *.datacamp.com*
@@ -48,21 +48,29 @@ class KeyboardShortcut {
   // accept two different KeyboardEventInit objects as input, each serving different purpose:
   // 1. for creating the KeyCombination instance that is used for detecting whether a given key combination (KeyboardEvent) should be handled by the shortcut
   // 2. for setting up the keyboard event(s) that should be triggered by the shortcut
-  constructor(kbComboKbEvtInit, dispatchedKbEvtInit = null) {
+  constructor(config) {
     if (new.target === KeyboardShortcut) {
       throw new TypeError(
         'KeyboardShortcut class is abstract, cannot instantiate directly!'
       );
     }
+
+    const { kbComboKbEvtInit, dispatchedKbEvtInit, shouldPreventDefault } =
+      config;
+
     this.keyCombination = new KeyCombination(kbComboKbEvtInit);
     if (dispatchedKbEvtInit) {
       // some keyboard shortcuts may trigger new keyDown event based on KeyboardEventInit
       this.keyboardEvent = new KeyboardEvent('keydown', dispatchedKbEvtInit);
     }
+    this.shouldPreventDefault = shouldPreventDefault;
   }
 
   handle(keyboardEvent) {
     if (this.keyCombination.matches(keyboardEvent)) {
+      if (this.shouldPreventDefault) {
+        keyboardEvent.preventDefault();
+      }
       this.apply(keyboardEvent);
       return true;
     }
@@ -78,12 +86,14 @@ class KeyboardShortcut {
 }
 
 class EditorTypingShortcut extends KeyboardShortcut {
-  constructor(assignedShortCutKbEvtInit, outputStr) {
-    super(
-      // defines the keyboard event we want to listen for
-      assignedShortCutKbEvtInit,
-      // defines the keyboard event this type of shortcut should trigger
-      {
+  constructor(
+    assignedShortCutKbEvtInit,
+    outputStr,
+    shouldPreventDefault = false
+  ) {
+    super({
+      kbComboKbEvtInit: assignedShortCutKbEvtInit,
+      dispatchedKbEvtInit: {
         // Shift + Insert -> should trigger editor paste! Before pasting, we copy to clipboard (at least that's the idea)
         key: 'Insert',
         code: 'Insert',
@@ -101,8 +111,9 @@ class EditorTypingShortcut extends KeyboardShortcut {
         bubbles: true,
         cancelable: true,
         composed: true,
-      }
-    );
+      },
+      shouldPreventDefault,
+    });
 
     this.outputStr = outputStr;
   }
@@ -122,8 +133,8 @@ class EditorTypingShortcut extends KeyboardShortcut {
 
 // allows running an arbitrary function by pressing a shortcut
 class FunctionShortcut extends KeyboardShortcut {
-  constructor(kbEvtInit, fn) {
-    super(kbEvtInit);
+  constructor(kbEvtInit, fn, shouldPreventDefault = false) {
+    super({ kbComboKbEvtInit: kbEvtInit, shouldPreventDefault });
     this.fn = fn;
   }
 
@@ -159,9 +170,13 @@ class KeyboardShortcuts {
 // Another issue is that some DataCamp shortcuts (e.g. Ctrl + K) don't work when using the code editor, probably because it also has keybindings for the same combination
 // This class works around those issues
 class ShortcutWorkaround extends KeyboardShortcut {
-  constructor(kbEvtInit) {
+  constructor(kbEvtInit, shouldPreventDefault = false) {
     // both the handled and dispatched KeyboardEvent are practically the same
-    super(kbEvtInit, kbEvtInit);
+    super({
+      kbComboKbEvtInit: kbEvtInit,
+      dispatchedKbEvtInit: kbEvtInit,
+      shouldPreventDefault,
+    });
   }
 
   apply(keyboardEvent) {
@@ -303,11 +318,35 @@ function createShortcuts() {
             'iframe[title*="video"]'
           )?.contentWindow; // contentWindow of iframe video is running in
           videoIframeWindow?.focus();
-
           // notify script instance running in iframe that it should focus the video player
           ScriptMessaging.notify(notificationIds.fKeyPressFromVideoPage);
         }
       }
+    ),
+    new FunctionShortcut(
+      {
+        code: 'Enter',
+        altKey: true,
+      },
+      () => document.querySelector('.dc-completed__continue button')?.click()
+    ),
+    new FunctionShortcut(
+      {
+        code: 'KeyJ',
+        ctrlKey: true,
+        shiftKey: true,
+      },
+      () => getCodeSubExerciseLink(-1)?.click(),
+      true
+    ),
+    new FunctionShortcut(
+      {
+        code: 'KeyK',
+        ctrlKey: true,
+        shiftKey: true,
+      },
+      () => getCodeSubExerciseLink(1)?.click(),
+      true
     ),
   ]);
 }
@@ -405,5 +444,23 @@ function getCurrentPage() {
   }
 }
 
-// script runs rightaway; could become issue if we rely on some kind of page state in our shortcuts
-run();
+function getCodeSubExerciseLink(offsetFromCurrent) {
+  const subExerciseBullets = selectElements('.progress-bullet__link');
+  const currSubExerciseIdx = subExerciseBullets.findIndex(b =>
+    b.className.includes('active-tab')
+  );
+  return subExerciseBullets[currSubExerciseIdx + offsetFromCurrent];
+}
+
+function selectElements(selector, root = document, warnIfNoMatch = false) {
+  const queryRoot = root.nodeName === 'IFRAME' ? root.contentWindow : root;
+
+  const matches = Array.from(queryRoot.querySelectorAll(selector));
+  if (warnIfNoMatch && matches.length === 0) {
+    alert(`Warning:\nNo element matches selector ${selector}!`);
+  }
+
+  return matches;
+}
+
+window.addEventListener('load', run, { once: true });
