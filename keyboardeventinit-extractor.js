@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KeyboardEventInit extractor
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.5
 // @description  Extracts and logs the parameters to new KeyboardEvent() required to reproduce any given KeyboardEvent.
 // @author       You
 // @include      *
@@ -17,54 +17,119 @@
 // One cannot set this manually, only real key strokes have this property set to true
 
 function run() {
+  const controlsContainer = document.createElement('div');
+  const controlsContainerId = 'keyboardeventinit-extractor-controls';
+  controlsContainer.id = controlsContainerId;
+
   const btnId = 'keyboardeventinit-extractor-btn';
   const btn = createButton('Listen for keystrokes', btnId);
 
-  let listenerActive = false;
+  document.body.appendChild(btn);
 
-  btn.addEventListener('click', () => {
-    if (!listenerActive) {
-      document.body.addEventListener('keydown', handleKeyboardEvent, {
-        capture: true,
-      });
-      btn.innerText = 'Stop listening';
-    } else {
-      document.body.removeEventListener('keydown', handleKeyboardEvent, {
-        capture: true,
-      });
-      btn.innerText = 'Listen for keystrokes';
+  const evtTypes = ['keydown', 'keypress', 'keyup'];
+  const checkboxContainerClass = 'keyboardeventinint-checkbox-container';
+  const checkboxContainers = evtTypes.map(evtType => {
+    const checkboxContainer = createCheckbox(evtType);
+    if (evtType === 'keydown') {
+      checkboxContainer.querySelector('input').checked = true;
     }
-
-    listenerActive = !listenerActive;
+    checkboxContainer.className = checkboxContainerClass;
+    return checkboxContainer;
   });
 
+  let listenersActive = false;
+
+  const updateKeyboardListeners = () => {
+    checkboxContainers.forEach((cc, i) => {
+      const evtType = evtTypes[i];
+      if (cc.querySelector('input').checked) {
+        document.addEventListener(evtType, handleKeyboardEvent, {
+          capture: true,
+        });
+      } else {
+        document.removeEventListener(evtType, handleKeyboardEvent, {
+          capture: true,
+        });
+      }
+    });
+  };
+
+  const toggleListening = () => {
+    listenersActive = !listenersActive;
+
+    btn.innerText = listenersActive
+      ? 'Stop listening'
+      : 'Listen for keystrokes';
+
+    updateKeyboardListeners();
+  };
+
+  btn.addEventListener('click', toggleListening);
+  checkboxContainers.forEach(c =>
+    c.addEventListener('change', updateKeyboardListeners)
+  );
+
+  checkboxContainers.forEach(c => controlsContainer.appendChild(c));
+  controlsContainer.appendChild(btn);
+  document.body.appendChild(controlsContainer);
+
   addStyle(`
-    #${btnId} {
+    #${controlsContainerId} {
+      color: black; 
+      background-color: white;
       position: fixed;
-      top: 50px;
+      top: 52px;
       right: 50px;
       z-index: 999;
+      display: grid; 
+      grid-template-columns: 1fr 2fr; 
+      grid-template-rows: 1fr 1fr 1fr;
+      grid-template-areas: 
+        ". button"
+        ". button"
+        ". button";
+      gap: 0 1em;
+      padding: 1em;
+      border: 1px solid grey;
+    }
+
+    #${btnId} {
       transition: 0.25s all;
       background: white;
       color: black;
       padding: 0.5em 1em;
       border: 1px solid black;
       border-radius: 5px;
+      grid-area: button;
+      width: 100%;
+      height: min-content;
+      align-self: center;
+      justify-self: center;
     }
 
     #${btnId}:active {
       transform: scale(0.92);
       box-shadow: 3px 2px 22px 1px rgba(0, 0, 0, 0.24);
     }
-  `);
+  
+    .${checkboxContainerClass}:hover, .${checkboxContainerClass} *:hover {
+      cursor: pointer;
+    }
 
-  document.body.appendChild(btn);
+    .${checkboxContainerClass} {
+      display: flex;
+      justify-content: flex-start;
+      height: 30px;
+      align-items: center;
+      gap: 10px;
+    }
+  `);
 }
 
 function handleKeyboardEvent(ev) {
   const eventInitStr = eventInitAsString(ev);
   GM.setClipboard(eventInitStr);
-  console.log('keydown detected, KeyboardEventInit:');
+  console.log(ev.type, 'detected, KeyboardEventInit:');
   console.log(eventInitStr);
 }
 
@@ -135,6 +200,24 @@ function createButton(text, id = null, className = null) {
   btn.innerText = text;
   btn.type = 'button';
   return btn;
+}
+
+function createCheckbox(labelText) {
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.name = labelText;
+  checkbox.id = labelText;
+
+  const label = document.createElement('label');
+  label.htmlFor = labelText;
+  label.appendChild(document.createTextNode(labelText));
+
+  const container = document.createElement('div');
+
+  container.appendChild(checkbox);
+  container.appendChild(label);
+
+  return container;
 }
 
 function addStyle(CSSText) {
