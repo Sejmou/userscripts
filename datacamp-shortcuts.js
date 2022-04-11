@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DataCamp code editor shortcuts
 // @namespace    http://tampermonkey.net/
-// @version      0.7.1
+// @version      0.7.5
 // @description  Adds keyboard shortcuts for use in DataCamp's R code editor + adds workaround for shortcuts overridden by Chrome shortcuts
 // @author       You
 // @include      *.datacamp.com*
@@ -55,24 +55,22 @@ class KeyboardShortcut {
       );
     }
     this.keyCombination = new KeyCombination(kbComboKbEvtInit);
-    if (dispatchedKbEvtInit)
+    if (dispatchedKbEvtInit) {
+      // some keyboard shortcuts may trigger new keyDown event based on KeyboardEventInit
       this.keyboardEvent = new KeyboardEvent('keydown', dispatchedKbEvtInit);
+    }
   }
 
   handle(keyboardEvent) {
     if (this.keyCombination.matches(keyboardEvent)) {
-      this.handleMatchingKeyboardEvent(keyboardEvent);
-      this.apply();
+      this.apply(keyboardEvent);
       return true;
     }
     return false;
   }
 
-  handleMatchingKeyboardEvent(keyboardEvent) {
-    // for some types of shortcuts, the keyboardEvent that caused the shortcut to trigger might be relevant
-  }
-
-  apply() {
+  // Note: not all subclasses of Shortcut need the keyboardEvent
+  apply(keyboardEvent) {
     throw new TypeError(
       'Cannot call apply() on KeyboardShortcut - abstract! Implement in subclass!'
     );
@@ -158,27 +156,31 @@ class KeyboardShortcuts {
 // Some DataCamp shortcuts are not "well-chosen", e.g. ctrl + j for going to previous lesson
 // This shortcut doesn't work in Google Chrome as is, because per default, this opens the downloads
 // A simple way to fix this would have been to add preventDefault() in the keydown event listener, but apparently DataCamp's developers forgot about that
-// In essence, this class just retriggers the key combination provided via keyBoardEventInit on document.body
+// Another issue is that some DataCamp shortcuts (e.g. Ctrl + K) don't work when using the code editor, probably because it also has keybindings for the same combination
+// This class works around those issues
 class ShortcutWorkaround extends KeyboardShortcut {
-  constructor(origKbEvtInit, remapKbEvtInit = null) {
-    if (!remapKbEvtInit) {
-      // both the handled and dispatched KeyboardEvent are practically the same
-      super(origKbEvtInit, origKbEvtInit);
-    } else {
-      // We want to trigger different KeyboardEvent when user hits key combination -> remap
-      super(origKbEvtInit, remapKbEvtInit);
+  constructor(kbEvtInit) {
+    // both the handled and dispatched KeyboardEvent are practically the same
+    super(kbEvtInit, kbEvtInit);
+  }
+
+  apply(keyboardEvent) {
+    keyboardEvent.preventDefault();
+    keyboardEvent.stopImmediatePropagation();
+
+    if (!keyboardEvent.repeat) {
+      const activeElement = document.activeElement;
+      document.body.focus();
+      document.body.dispatchEvent(this.keyboardEvent);
+      activeElement.focus();
+      this.shortcutBeingPressed = true;
     }
   }
 
-  apply() {
-    const activeElement = document.activeElement;
-    document.body.focus();
-    document.body.dispatchEvent(this.keyboardEvent);
-    activeElement.focus();
-  }
-
-  handleMatchingKeyboardEvent(keyboardEvent) {
-    keyboardEvent.preventDefault();
+  handleShortcutKeyReleased(keyboardEvent) {
+    if (keyboardEvent.code === this.keyCombination.code) {
+      this.shortcutBeingPressed = false;
+    }
   }
 }
 
@@ -244,16 +246,6 @@ function createShortcuts() {
       cancelable: true,
       composed: true,
     }),
-    new ShortcutWorkaround(
-      // Hitting Enter at end of exercise never works (despite message being shown)
-      {
-        code: 'Enter',
-        altKey: true,
-      },
-      () => {
-        document.querySelector('.dc-completed__continue button')?.click();
-      }
-    ),
     // TODO: maybe add class for shortcuts that only apply to certain page?
     // Note: Would probably require change in KeyboardShortcuts (applyMatching()!), too
     new FunctionShortcut(
@@ -413,4 +405,5 @@ function getCurrentPage() {
   }
 }
 
-window.addEventListener('load', run, { once: true });
+// script runs rightaway; could become issue if we rely on some kind of page state in our shortcuts
+run();
