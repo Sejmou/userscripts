@@ -1,13 +1,16 @@
 // ==UserScript==
 // @name         KeyboardEventInit extractor
 // @namespace    http://tampermonkey.net/
-// @version      0.5
+// @version      0.5.5
 // @description  Extracts and logs the parameters to new KeyboardEvent() required to reproduce any given KeyboardEvent.
 // @author       You
 // @include      *
 // @icon         data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==
 // @grant        GM.setClipboard
 // ==/UserScript==
+
+// Config
+const preventEventDefault = true; // whether preventDefault() should be called by the KeyboardEvent listeners
 
 // Usage: Click button created by the script to activate the keyboard listener
 // The KeyboardEventInit() params for each 'keydown' event on document.body are then copied to the clipboard
@@ -42,7 +45,7 @@ function run() {
   const updateKeyboardListeners = () => {
     checkboxContainers.forEach((cc, i) => {
       const evtType = evtTypes[i];
-      if (cc.querySelector('input').checked) {
+      if (listenersActive && cc.querySelector('input').checked) {
         document.addEventListener(evtType, handleKeyboardEvent, {
           capture: true,
         });
@@ -131,6 +134,7 @@ function handleKeyboardEvent(ev) {
   GM.setClipboard(eventInitStr);
   console.log(ev.type, 'detected, KeyboardEventInit:');
   console.log(eventInitStr);
+  if (preventEventDefault) ev.preventDefault();
 }
 
 function eventInitAsString(keyboardEvent) {
