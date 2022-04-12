@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         DataCamp code editor shortcuts
+// @name         DataCamp keyboard shortcuts
 // @namespace    http://tampermonkey.net/
-// @version      0.8.5
-// @description  Adds keyboard shortcuts for use in DataCamp's R code editor + adds workaround for shortcuts overridden by Chrome shortcuts
+// @version      0.8.6
+// @description  Adds custom keyboard shortcuts for use in DataCamp + workarounds for existing shortcuts overridden by Chrome's built-in shortcuts
 // @author       You
 // @include      *.datacamp.com*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=datacamp.com
@@ -12,12 +12,13 @@
 // @grant        GM.addValueChangeListener
 // ==/UserScript==
 
-// Two types of shortcuts are supported by this script:
-// 1. EditorTypingShortcuts: Paste any given string to the clipboard
+// Three types of shortcuts are supported by this script:
+// 1. EditorTypingShortcut: Paste any given string to the clipboard
 //      Usage: press shortcut for required symbol, it will then be pasted to your clipboard and you just have to do ctrl + v to insert the symbol
 //      Unfortunately, direct pasting from the script is not possible due to security restrictions on the JavaScript Clipboard API :/
 //
 // 2. ShortcutWorkaround: They essentially make DataCamp's built-in shortcuts work (for details see comments in/above class)
+// 3. FunctionShortcut: Execute arbitrary functions when hitting the assigned key combination
 
 // There may be a smarter way to store key combinations and shortcuts; If you know one, let me know lol
 class KeyCombination {
@@ -131,40 +132,7 @@ class EditorTypingShortcut extends KeyboardShortcut {
   }
 }
 
-// allows running an arbitrary function by pressing a shortcut
-class FunctionShortcut extends KeyboardShortcut {
-  constructor(kbEvtInit, fn, shouldPreventDefault = false) {
-    super({ kbComboKbEvtInit: kbEvtInit, shouldPreventDefault });
-    this.fn = fn;
-  }
-
-  apply(keyBoardEvent) {
-    this.fn(keyBoardEvent);
-  }
-}
-
-// Stores a collection of KeyboardShortcuts; can be used to find and apply shortcuts
-class KeyboardShortcuts {
-  // shortcuts should be an array of KeyboardShortcut objects
-  // TODO: add logic for checking if multiple shortcuts listen for same KeyCombination
-  constructor(shortcuts) {
-    this.shortcuts = shortcuts;
-  }
-
-  // applies a shortcut if it matches
-  // TODO: think about whether multiple shortcut bindings for same keyboard combination should be allowed
-  // If yes, current solution wouldn't work
-  applyMatching(keyboardEvent) {
-    return this.shortcuts.find(s => s.handle(keyboardEvent));
-  }
-
-  // TODO: add logic for checking if keybinding for KeyCombination of shortcut already exists
-  add(shortcut) {
-    this.shortcuts.push(shortcut);
-  }
-}
-
-// Some DataCamp shortcuts are not "well-chosen", e.g. ctrl + j for going to previous lesson
+// Some DataCamp shortcuts are not "well-chosen", e.g. Ctrl + J for going to previous lesson
 // This shortcut doesn't work in Google Chrome as is, because per default, this opens the downloads
 // A simple way to fix this would have been to add preventDefault() in the keydown event listener, but apparently DataCamp's developers forgot about that
 // Another issue is that some DataCamp shortcuts (e.g. Ctrl + K) don't work when using the code editor, probably because it also has keybindings for the same combination
@@ -196,6 +164,39 @@ class ShortcutWorkaround extends KeyboardShortcut {
     if (keyboardEvent.code === this.keyCombination.code) {
       this.shortcutBeingPressed = false;
     }
+  }
+}
+
+// allows running an arbitrary function by pressing a shortcut
+class FunctionShortcut extends KeyboardShortcut {
+  constructor(kbEvtInit, fn, shouldPreventDefault = false) {
+    super({ kbComboKbEvtInit: kbEvtInit, shouldPreventDefault });
+    this.fn = fn;
+  }
+
+  apply(keyBoardEvent) {
+    this.fn(keyBoardEvent);
+  }
+}
+
+// Stores a collection of KeyboardShortcuts; can be used to find and apply shortcuts
+class KeyboardShortcuts {
+  // shortcuts should be an array of KeyboardShortcut objects
+  // TODO: add logic for checking if multiple shortcuts listen for same KeyCombination
+  constructor(shortcuts) {
+    this.shortcuts = shortcuts;
+  }
+
+  // applies a shortcut if it matches
+  // TODO: think about whether multiple shortcut bindings for same keyboard combination should be allowed
+  // If yes, current solution wouldn't work
+  applyMatching(keyboardEvent) {
+    return this.shortcuts.find(s => s.handle(keyboardEvent));
+  }
+
+  // TODO: add logic for checking if keybinding for KeyCombination of shortcut already exists
+  add(shortcut) {
+    this.shortcuts.push(shortcut);
   }
 }
 
