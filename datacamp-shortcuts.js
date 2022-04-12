@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DataCamp code editor shortcuts
 // @namespace    http://tampermonkey.net/
-// @version      0.8
+// @version      0.8.5
 // @description  Adds keyboard shortcuts for use in DataCamp's R code editor + adds workaround for shortcuts overridden by Chrome shortcuts
 // @author       You
 // @include      *.datacamp.com*
@@ -138,8 +138,8 @@ class FunctionShortcut extends KeyboardShortcut {
     this.fn = fn;
   }
 
-  apply() {
-    this.fn();
+  apply(keyBoardEvent) {
+    this.fn(keyBoardEvent);
   }
 }
 
@@ -283,13 +283,17 @@ function createShortcuts() {
         composed: true,
       },
       () => {
-        const currentPage = getCurrentPage();
-        if (currentPage === 'video-iframe') {
-          document.activeElement.blur();
-          ScriptMessaging.notify(notificationIds.escKeyPressFromVideoIframe);
+        const modal = document.querySelector('.modal-overlay'); // modal that opens after hitting Ctrl + O
+        if (modal) {
+          // close modal
+          modal.click();
         } else {
-          // closes modal that opens after hitting Ctrl + O (in case it is open)
-          document.querySelector('.modal-overlay')?.click();
+          // leave any element that is currently focussed (probably code editor if in main window or video player if in video-iframe)
+          document.activeElement.blur();
+
+          if (getCurrentPage() === 'video-iframe') {
+            ScriptMessaging.notify(notificationIds.escKeyPressFromVideoIframe);
+          }
         }
       }
     ),
@@ -312,14 +316,29 @@ function createShortcuts() {
         cancelable: true,
         composed: true,
       },
-      () => {
-        if (getCurrentPage() === 'video-page') {
+      keyboardEvent => {
+        const currentPage = getCurrentPage();
+        if (currentPage === 'video-page') {
           const videoIframeWindow = document.querySelector(
             'iframe[title*="video"]'
           )?.contentWindow; // contentWindow of iframe video is running in
           videoIframeWindow?.focus();
           // notify script instance running in iframe that it should focus the video player
           ScriptMessaging.notify(notificationIds.fKeyPressFromVideoPage);
+        } else {
+          // try to focus into the code editor (if it exists)
+          const editorTextArea = document?.querySelector(
+            'textarea.inputarea.monaco-mouse-cursor-text'
+          );
+
+          if (editorTextArea) {
+            // we don't want to enter the pressed character ('f') into the editor - stop propagation!
+            keyboardEvent.stopImmediatePropagation();
+
+            // focus into editor window
+            // for some reason, we have to wrap into setTimeout, otherwise 'f' is still entered into editor
+            setTimeout(() => editorTextArea.focus(), 0);
+          }
         }
       }
     ),
