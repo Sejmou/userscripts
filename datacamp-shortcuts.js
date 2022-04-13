@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DataCamp keyboard shortcuts
 // @namespace    http://tampermonkey.net/
-// @version      0.8.6
+// @version      0.8.7
 // @description  Adds custom keyboard shortcuts for use in DataCamp + workarounds for existing shortcuts overridden by Chrome's built-in shortcuts
 // @author       You
 // @include      *.datacamp.com*
@@ -465,9 +465,13 @@ function getCurrentPage() {
 }
 
 function getCodeSubExerciseLink(offsetFromCurrent) {
-  const subExerciseBullets = selectElements('.progress-bullet__link');
+  const subExerciseBullets = [
+    ...selectElements('.progress-bullet__link'), // will return values if bullets horizontally arranged
+    ...selectElements('.bullet-instructions-list .bullet-instruction'), // vertically arranged
+  ];
+
   const currSubExerciseIdx = subExerciseBullets.findIndex(b =>
-    b.className.includes('active-tab')
+    b.className.includes('active')
   );
   return subExerciseBullets[currSubExerciseIdx + offsetFromCurrent];
 }
