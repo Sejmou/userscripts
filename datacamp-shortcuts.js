@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DataCamp keyboard shortcuts
 // @namespace    http://tampermonkey.net/
-// @version      0.8.7
+// @version      0.8.8
 // @description  Adds custom keyboard shortcuts for use in DataCamp + workarounds for existing shortcuts overridden by Chrome's built-in shortcuts
 // @author       You
 // @include      *.datacamp.com*
@@ -326,7 +326,16 @@ function createShortcuts() {
           videoIframeWindow?.focus();
           // notify script instance running in iframe that it should focus the video player
           ScriptMessaging.notify(notificationIds.fKeyPressFromVideoPage);
-        } else {
+        }
+      }
+    ),
+    new FunctionShortcut(
+      {
+        code: 'KeyE',
+        altKey: true,
+      },
+      keyboardEvent => {
+        if (getCurrentPage() === 'other') {
           // try to focus into the code editor (if it exists)
           const editorTextArea = document?.querySelector(
             'textarea.inputarea.monaco-mouse-cursor-text'
@@ -335,6 +344,7 @@ function createShortcuts() {
           if (editorTextArea) {
             // we don't want to enter the pressed character ('f') into the editor - stop propagation!
             keyboardEvent.stopImmediatePropagation();
+            keyboardEvent.preventDefault(); // Alt + E triggers some browser stuff otherwise
 
             // focus into editor window
             // for some reason, we have to wrap into setTimeout, otherwise 'f' is still entered into editor
