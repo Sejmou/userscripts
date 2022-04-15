@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DataCamp keyboard shortcuts
 // @namespace    http://tampermonkey.net/
-// @version      0.8.8
+// @version      0.8.9
 // @description  Adds custom keyboard shortcuts for use in DataCamp + workarounds for existing shortcuts overridden by Chrome's built-in shortcuts
 // @author       You
 // @include      *.datacamp.com*
@@ -206,6 +206,7 @@ function createShortcuts() {
     new EditorTypingShortcut({ code: 'Slash', altKey: true }, '<-'),
     new EditorTypingShortcut({ code: 'Period', altKey: true }, '%>%'),
     new EditorTypingShortcut({ code: 'KeyI', altKey: true }, '%in%'),
+    new EditorTypingShortcut({ code: 'KeyR', altKey: true }, '%R%'),
     new ShortcutWorkaround({
       // Ctrl + J
       key: 'j',
