@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DataCamp copy helper
 // @namespace    http://tampermonkey.net/
-// @version      2.10.1
+// @version      2.11
 // @description  Copies content from DataCamp courses into your clipboard (via button or Ctrl + Shift + C)
 // @author       You
 // @include      *.datacamp.com*
@@ -18,16 +18,16 @@ const taskAndSolutionHeadings = true; // whether fitting subheadings for differe
 const copyCodeOutputCheckboxInitState = true; // whether the checkbox for copying output of the code should be checked per default
 const copyRSessionCodeComments = false;
 const copyEmptyLines = true;
-const copyEditorCodeFromConsoleOut = true; // whether editor code reappearing in the console output should also be copied - useful to keep track of what code produced what output
+const copyEditorCodeFromConsoleOut = false; // whether editor code reappearing in the console output should also be copied - useful to keep track of what code produced what output
 const copyOnlyConsoleOutOfCodeInEditor = true; // whether all previous output of the console that is not related to last execution of code currently in editor should be excluded when copying
 const limitMaxLinesPerConsoleOut = true; // whether the maximum number of lines included when copying a single "thing" printed to the console should be limited when copying
-const maxLinesPerConsoleOut = 20; // the maximum number of lines included when copying a single "thing" printed to the console (if limitMaxLinesPerConsoleOut true)
+const maxLinesPerConsoleOut = 26; // the maximum number of lines included when copying a single "thing" printed to the console (if limitMaxLinesPerConsoleOut true)
 const submitAnswerOnCopy = true; // whether the answer should automatically be submitted before copying it
 const pasteSubExercisesTogether = true; // CAUTION: possibly a bit buggy - try refreshing browser if it doesn't work first time! defines whether the instructions, code, and, optionally, output of all completed sub-exercises should be pasted together when copying (executing the code of each sub-exercise, too)
 const includeConsoleOutInfoText = false; // Adds text indicating that the console output comes from R session on DataCamp, not local machine
 const wideConsoleOutLinesStrategy = 'truncate'; // specify how to deal with console output that is too wide; options: 'wrap', 'truncate', 'none'
 const maxConsoleOutLineWidth = 90; // recommended: 90 -> should be exactly width of regular R Markdown code cells
-const splitConsoleOut = true; // whether a seperate code block should be created for each code statement that causes some console output; if false, all console output is put into the same code block; NOTE: currently only works if copyEditorCodeFromConsoleOut is also true
+const splitConsoleOut = false; // whether a seperate code block should be created for each code statement that causes some console output; if false, all console output is put into the same code block; NOTE: currently only works if copyEditorCodeFromConsoleOut is also true
 
 // TODO: remove this global const if/when refactoring the codebase
 const warningSnackbarId = 'copy-helper-warning-snackbar';
@@ -266,21 +266,18 @@ async function answerSubmitted() {
         if (isEnabled) {
           obs.disconnect();
 
-          const editorWrapper = selectSingleElement('[id*=editorTab]');
+          const editorWindow = getCurrentlyViewedEditorWindow();
 
-          // editor code for next exercise is not available immediately, it is added later
-          // we need to wait for all code lines to appear
-          // line numbers appear first, lines (.view-line containers) appear later, one-by-one
+          // editor code for next exercise is not always available immediately, sometimes it is added later
+          // in those cases we need to wait for all code lines to appear
+          // line numbers appear all at once, lines (.view-line containers) appear one-by-one
           let totalLineCount = Number.MAX_VALUE;
           let addedLinesCount = 0;
-          const editorWrapperObs = new MutationObserver((recs, obs) => {
-            if (addedLinesCount == totalLineCount) {
-              obs.disconnect();
-              resolve();
-              return;
-            }
+          const editorWindowObs = new MutationObserver((recs, obs) => {
             recs.forEach(rec => {
               if (rec.addedNodes?.length > 0) {
+                // first added node contains '1' -> assume that it is the first line number
+                //                                  and all other added nodes are line numbers as well
                 const lineNumbersAdded =
                   rec.addedNodes[0].textContent.trim() === '1';
                 if (lineNumbersAdded) {
@@ -289,19 +286,19 @@ async function answerSubmitted() {
                 rec.addedNodes.forEach(el => {
                   if (el.className.includes('view-line')) {
                     addedLinesCount++;
-                    if (addedLinesCount === totalLineCount) {
-                      // for some reason, this line seems to never be reached in practice!?
-                      obs.disconnect();
-                      resolve();
-                      return;
-                    }
                   }
                 });
               }
             });
+
+            if (addedLinesCount == totalLineCount) {
+              obs.disconnect();
+              resolve();
+              return;
+            }
           });
 
-          editorWrapperObs.observe(editorWrapper, {
+          editorWindowObs.observe(editorWindow, {
             childList: true,
             subtree: true,
           });
@@ -587,12 +584,12 @@ async function getExerciseContent(
   const hasSubexercises = subExIdx !== -1;
 
   if (!hasSubexercises) {
-    if (taskAndSolutionHeadings) exerciseBody += '### Task';
+    if (taskAndSolutionHeadings) exerciseBody += '### Task\n\n';
     exerciseBody += getExerciseInstructions();
     if (taskAndSolutionHeadings) exerciseBody += '### Solution\n\n';
     exerciseBody += await getExerciseCode(includeConsoleOutput, submitAnswer);
   } else {
-    if (taskAndSolutionHeadings) exerciseBody += '### Tasks';
+    if (taskAndSolutionHeadings) exerciseBody += '### Tasks\n\n';
     if (pasteSubExercisesTogether) {
       while (getLinkToNextSubExercise()) {
         exerciseBody += getSubExerciseInstructions(subExIdx);
@@ -661,8 +658,12 @@ async function getEditorCodeLines() {
   // We have to sort them ourselves
 
   // That's why all this weird code is necessary...
+  const editorWindow = getCurrentlyViewedEditorWindow();
 
-  const lineMarkerContainer = selectElements('.margin-view-overlays')[0];
+  const lineMarkerContainer = selectSingleElement(
+    '.margin-view-overlays',
+    editorWindow
+  );
 
   const lineMarkers = Array.from(lineMarkerContainer.children);
   lineMarkers.sort(compareElementYPos);
@@ -689,7 +690,7 @@ async function getEditorCodeLines() {
     );
   }
 
-  const linesContainer = selectElements('.view-lines')[0];
+  const linesContainer = selectSingleElement('.view-lines', editorWindow);
   const editorLines =
     lineNumbers.length == 0 ? [] : new Array(lineNumbers.at(-1) + 1).fill('');
 
@@ -703,15 +704,16 @@ async function getEditorCodeLines() {
     '.lm_splitter.lm_vertical .lm_drag_handle'
   );
 
-  const editorWindow = selectElements('.overflow-guard')[0];
-
   if (isAboveOrOverlapping(editorViewportBottom, lineMarkers.at(-1))) {
     // some parts of the code are still "unseen" -> we need to scroll all the remaining stuff into view
     let y = 0;
 
+    // this is the element we need to access for scrolling to work
+    const overflowGuard = selectSingleElement('.overflow-guard', editorWindow);
+
     while (isAboveOrOverlapping(editorViewportBottom, lineMarkers.at(-1))) {
       y += 50;
-      editorWindow.scrollTop = y;
+      overflowGuard.scrollTop = y;
 
       // TODO: think about better approach for this
       const newLineNumbersAdded = () =>
@@ -765,6 +767,42 @@ async function getEditorCodeLines() {
   editorLinesUnprocessed.forEach(addToEditorLines);
 
   return editorLines;
+}
+
+function getCurrentlyViewedEditorWindow() {
+  // Problem: there's possibly multiple tabs in the DataCamp code editor
+  // e.g. script.R, and solution.R
+  // only the currently viewed tab contains actual code
+  // The other code editor tabs are accessible via the DOM but their content is incomplete -> can't copy from there
+
+  // Goal: find tab currently viewed editor belongs to
+  // based on that, select the correct .overflow-guard element, which is essentially the container for the editor text
+
+  // first, search for tabContainer that contains the editor tabs
+  const tabContainers = selectElements('.lm_tabs');
+  const editorTabContainer = tabContainers.find(c =>
+    Array.from(c.children).some(
+      child => child.getAttribute('title') === 'script.R'
+    )
+  );
+
+  const editorTabs = selectElements('.lm_tab', editorTabContainer);
+  const activeTabIdx = editorTabs.findIndex(t =>
+    t.className.includes('active')
+  );
+
+  const editorsSectionHeader = editorTabContainer.parentElement;
+  if (!editorsSectionHeader.className.includes('lm_header')) {
+    warn('Expected element to have class "lm_header", but it was not present!');
+  }
+  const editorsSectionContent = editorsSectionHeader.nextElementSibling;
+  if (!editorsSectionContent.className.includes('lm_items')) {
+    warn('Expected element to have class "lm_items", but it was not present!');
+  }
+
+  const editors = selectElements('[id*=editorTab]', editorsSectionContent);
+
+  return editors[activeTabIdx];
 }
 
 // useful when DOM element ordering does NOT correspond to vertical position on page
@@ -1073,7 +1111,8 @@ function getSubExerciseInstructions(idx = 0) {
     currentInstructions
       .split('\n')
       .map(line => '    ' + line)
-      .join('\n')
+      .join('\n') +
+    '\n\n'
   );
 }
 
@@ -1721,7 +1760,7 @@ function showSnackbar(id, text) {
     snackbar.innerText = text;
     snackbar.classList.add('visible');
   } else {
-    console.warn('Snackbar with ID', id, 'not found!');
+    warn('Snackbar with ID', id, 'not found!');
   }
 }
 
@@ -1790,6 +1829,10 @@ function objToCssPropsAndValsStr(obj) {
 
 function log(...content) {
   console.log('[DataCamp copy helper]', ...content);
+}
+
+function warn(...content) {
+  console.warn('[DataCamp copy helper]', ...content);
 }
 
 window.addEventListener('load', run, { once: true });
