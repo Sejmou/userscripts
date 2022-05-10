@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DataCamp copy helper
 // @namespace    http://tampermonkey.net/
-// @version      2.11
+// @version      2.11.1
 // @description  Copies content from DataCamp courses into your clipboard (via button or Ctrl + Shift + C)
 // @author       You
 // @include      *.datacamp.com*
@@ -1078,7 +1078,7 @@ function getExerciseInstructions() {
     })
     .join('\n');
 
-  return '\n' + instructions;
+  return instructions;
 }
 
 function getSubExerciseInstructions(idx = 0) {
