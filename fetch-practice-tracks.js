@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Fetch Practice Track Video Links
 // @namespace    http://tampermonkey.net/
-// @version      0.5
+// @version      0.6
 // @description  Fetches YouTube video links for all tracks of a given Musical page on musicalpracticetracks.com
 // @author       You
 // @match        https://www.musicalpracticetracks.com/index.php/*/*
@@ -57,7 +57,17 @@ const songTitle = songNoAndTitle
       : songNoAndTitle.length
   )
   .trim();
-console.log(songTitle);
+
+const songIdx = musicalSongs.findIndex(song => song.no === songNo);
+
+if (songIdx !== -1) {
+  console.log('existing song data found:', musicalSongs[songIdx]);
+  const continueConfirmed = confirm(
+    `Entry for song no. ${songNo} already exists in song array for '${musicalId}' (check browser console)!
+    If you're sure this is ok, click 'confirm' to continue and overwrite the existing entry.`
+  );
+  if (!continueConfirmed) return;
+}
 
 const ytPlayerWrapper = document.querySelector('.fluid-width-video-wrapper');
 const ytVideoPlayer = ytPlayerWrapper.querySelector('iframe');
@@ -134,9 +144,7 @@ const ytPlayerObs = new MutationObserver((_, obs) => {
           'accompaniment',
           'practice',
           'track',
-          'frollo',
-          'quasimodo',
-          'esmeralda',
+          'instrumental',
         ];
 
         const tracks = Array.from(trackLinks).map(([rawTitle, url]) => {
@@ -167,16 +175,12 @@ const ytPlayerObs = new MutationObserver((_, obs) => {
 
         console.log('musical songs', musicalSongs);
 
-        const songIdx = musicalSongs.findIndex(song => song.songNo === songNo);
-        if (songIdx === -1) {
-          musicalSongs.push(songObj);
-          console.log('all musicals', allMusicals);
-          GM_setValue('musicals', allMusicals);
-        } else {
-          alert(
-            `Entry for song no. ${songNo} already exists in song array for '${musicalId}'!`
-          );
-        }
+        if (songIdx !== -1) musicalSongs[songIdx] = songObj;
+        else musicalSongs.push(songObj);
+
+        console.log('all musicals', allMusicals);
+
+        GM_setValue('musicals', allMusicals);
 
         if (nextSongLink) {
           nextSongLink.click();
