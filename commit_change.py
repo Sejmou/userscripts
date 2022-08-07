@@ -122,6 +122,10 @@ def main():
             prev_file_version_str = match.group(1)
             prev_file_version = version.parse(prev_file_version_str)
 
+    print(
+        f"You're about to commit and push {f'a new file ({selected_file})' if is_untracked else f'changes to {selected_file}'}."
+    )
+
     if is_untracked and file_version > version.parse("0.0.1"):
         while True:
             resp = input(
