@@ -5,6 +5,7 @@ import sys
 from packaging import version
 import re
 import os
+from collections import defaultdict
 
 
 def cmd_out(cmd: str):
@@ -22,39 +23,79 @@ def error(msg: str):
 
 
 def main():
-    modified_files = list(filter(len, cmd_out("git ls-files . -m").split("\n")))
-    untracked_files = list(
-        filter(len, cmd_out("git ls-files --others --exclude-standard").split("\n"),)
-    )
+    status_dict = defaultdict(list)
 
-    all_files = modified_files + untracked_files
-    all_files = list(filter(lambda fname: fname.endswith(".js"), all_files))
+    def add_file_to_status_dict(git_file_status_line):
+        # first char: staged changes, second char: unstaged changes
+        # possible status values: A (added), M (modified), D (deleted), ? (untracked)
+        # actually, in total untracked is always '??' and A can only be 'A '
+        status = git_file_status_line[0:2]
+        name = git_file_status_line[3:]
+        if status[0] == "D ":
+            error(
+                "You have staged the deletion of a file. Please handle + commit it manually."
+            )
+        if name.endswith(".js"):
+            status_dict[status].append(name)
+        else:
+            # need to handle commit_change.py separately, otherwise I would not be able to test changes to the script properly
+            if name == "commit_change.py" and status[0] != " ":
+                error(
+                    "Please commit changes to 'commit_change.py' separately. This script only handles userscript (.js) files"
+                )
+            elif name != "commit_change.py":
+                error(
+                    f"'{name}' is not a JS file, please handle it separately. This script only handles userscript (.js) files"
+                )
 
-    u_suff = " (new)"
-    untracked_file_opts = [fname + u_suff for fname in untracked_files]
+    for line in cmd_out("git status -s").split("\n"):
+        add_file_to_status_dict(line)
 
-    all_file_opts = modified_files + untracked_file_opts
+    staged_changes = []
 
-    if len(all_files) == 0:
-        error("No .js files changed, nothing to commit!")
+    for status, files in status_dict.items():
+        if status[0] != " " and status != "??":
+            for file in files:
+                staged_changes.append[file]
 
-    selected_file = (
-        inquirer.list_input(
-            "What userscript change would you like to commit?", choices=all_file_opts,
+    if len(staged_changes) > 1:
+        error(
+            "Multiple userscript file changes are already staged. Please unstage all except one with 'git restore --staged filepath' and try again."
         )
-        if len(all_files) > 1
-        else all_files[0]
-    )
+    elif len(staged_changes) == 1:
+        pass
 
-    if len(all_files) == 1:
-        print(
-            f"File '{selected_file}' was selected as it is the only file with changes"
+    files_to_pick = []
+    filepicker_opts = []
+
+    def get_status_desc(status):
+        if status == "??":
+            return "new"
+        if status == " M":
+            return "modified"
+        return ""  # shouldn't be reachable, not entirely sure
+
+    def add_filepicker_option(file, status):
+        files_to_pick.append(file)
+        filepicker_opts.append(f"{file} ({get_status_desc(status)})")
+
+    for status, files in status_dict.items():
+        if status[0] == " " or status[0] == "?":
+            for f in files:
+                add_filepicker_option(f, status)
+        else:
+            error("Whoah, this line should be unreachable")
+
+    if len(filepicker_opts) == 0:
+        error("No userscript files changed, nothing to commit!")
+
+    if len(filepicker_opts) > 1:
+        selected_file = inquirer.list_input(
+            "What userscript change would you like to commit?",
+            choices=list(zip(filepicker_opts, files_to_pick)),
         )
-
-    is_untracked = u_suff in selected_file
-
-    if selected_file.endswith(u_suff):
-        selected_file = selected_file[: -len(u_suff)]
+    else:
+        selected_file = files_to_pick[0]
 
     file_version_str = ""
     with open(selected_file, "r") as f:
@@ -70,6 +111,8 @@ def main():
         )
     file_version = version.parse(file_version_str)
 
+    is_untracked = selected_file in status_dict["??"]
+
     if not is_untracked:
         file_previous_commit = cmd_out(f"git show HEAD:{selected_file}")
         match = re.search(
@@ -79,7 +122,19 @@ def main():
             prev_file_version_str = match.group(1)
             prev_file_version = version.parse(prev_file_version_str)
 
-    if not is_untracked and file_version > prev_file_version:
+    if is_untracked and file_version > version.parse("0.0.1"):
+        while True:
+            resp = input(
+                f"Script version in @version tag is {file_version}. Stick with it? (Yes/No)? "
+            )
+            resp = resp.lower()
+            if resp == "y" or resp == "yes":
+                version_confirmed = True
+                break
+            if resp == "n" or resp == "no":
+                version_confirmed = False
+                break
+    elif file_version > prev_file_version:
         while True:
             resp = input(
                 f"Current @version tag ({file_version}) > previous ({prev_file_version}). Stick with this version (Yes/No)? "
@@ -126,7 +181,7 @@ def main():
         )
 
     file_no_ext = re.sub("\.js$", "", selected_file)
-    commit_msg = f"{file_no_ext} v {file_version}: {input('Commit message: ')}"
+    commit_msg = f"{file_no_ext} v{file_version}: {input('Commit message: ')}"
 
     with open(selected_file, "w") as f:
         f.write(file_content_updated_version)
