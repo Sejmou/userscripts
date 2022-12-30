@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube subtitle selector
 // @namespace    http://tampermonkey.net/
-// @version      0.3.3
+// @version      0.3.4
 // @description  Set YouTube subtitles to English automatically
 // @author       Sejmou
 // @match        https://www.youtube.com/watch*
@@ -83,3 +83,5 @@ const observer = new MutationObserver(mutations => {
   });
 });
 observer.observe(body, { childList: true, subtree: true });
+
+main();
