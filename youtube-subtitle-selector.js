@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube subtitle selector
 // @namespace    http://tampermonkey.net/
-// @version      0.2.1
+// @version      0.3
 // @description  Replace the commit timestamps on the 'commits' subpage of any repo with local time
 // @author       Sejmou
 // @match        https://www.youtube.com/watch*
@@ -11,22 +11,33 @@
 // @grant        none
 // ==/UserScript==
 async function main() {
-  // navigate to https://www.youtube.com/account_playback "Include auto-generated captions (when available)", then the following should work to auto-activate generated English subtitles
   if (!window.location.href.includes('/watch')) return;
-  document.querySelector('.ytp-settings-button').click();
-  document
-    .querySelector('.ytp-menuitem:nth-of-type(3) .ytp-menuitem-content')
-    .click();
-  document.querySelector('[role="menuitemradio"]:nth-of-type(2)').click();
-  document.querySelector('.ytp-settings-button').click();
+  const subtitleOptionSelector =
+    '.ytp-menuitem:nth-of-type(3) .ytp-menuitem-content';
+  const settingsButtonSelector = '.ytp-settings-button';
 
-  document.querySelector('.ytp-settings-button').click();
-  document
-    .querySelector('.ytp-menuitem:nth-of-type(3) .ytp-menuitem-content')
-    .click();
+  document.querySelector(settingsButtonSelector).click();
+  document.querySelector(subtitleOptionSelector).click();
+  const englishOption = getElementByXpath(
+    "//*[contains(@class, 'ytp-menuitem-label')][contains(text(),'English')]"
+  );
+  if (englishOption) {
+    englishOption.click();
+    document.querySelector(settingsButtonSelector).click();
+    return;
+  }
+
+  // if we're here, we need to select auto translate and open settings menu once more to reach the automatic subtitle selection
+  getElementByXpath(
+    "//*[contains(@class, 'ytp-menuitem-label')][contains(text(),'Auto')]"
+  ).click();
+  document.querySelector(settingsButtonSelector).click();
+
+  document.querySelector(settingsButtonSelector).click();
+  document.querySelector(subtitleOptionSelector).click();
   document.querySelector('[role="menuitemradio"]:nth-of-type(3)').click();
   document.querySelector('[role="menuitemradio"]:nth-of-type(27)').click(); // 27th entry is English
-  document.querySelector('.ytp-settings-button').click();
+  document.querySelector(settingsButtonSelector).click();
   document.querySelector('.ytp-subtitles-button').click();
   document.querySelector('.ytp-subtitles-button').click();
 }
@@ -42,6 +53,16 @@ function dispatchKeyboardEvent(kbEvtInit) {
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function getElementByXpath(path) {
+  return document.evaluate(
+    path,
+    document,
+    null,
+    XPathResult.FIRST_ORDERED_NODE_TYPE,
+    null
+  ).singleNodeValue;
 }
 
 setTimeout(main, 2000);
