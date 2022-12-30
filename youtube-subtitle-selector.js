@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         YouTube subtitle selector
 // @namespace    http://tampermonkey.net/
-// @version      0.3
-// @description  Replace the commit timestamps on the 'commits' subpage of any repo with local time
+// @version      0.3.1
+// @description  Set YouTube subtitles to English automatically
 // @author       Sejmou
 // @match        https://www.youtube.com/watch*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=github.com
@@ -27,7 +27,7 @@ async function main() {
     return;
   }
 
-  // if we're here, we need to select auto translate and open settings menu once more to reach the automatic subtitle selection
+  // if we're here, need to select auto translate and open settings menu once more to reach the automatic subtitle selection
   getElementByXpath(
     "//*[contains(@class, 'ytp-menuitem-label')][contains(text(),'Auto')]"
   ).click();
