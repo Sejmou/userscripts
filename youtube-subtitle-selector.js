@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube subtitle selector
 // @namespace    http://tampermonkey.net/
-// @version      0.3.1
+// @version      0.3.2
 // @description  Set YouTube subtitles to English automatically
 // @author       Sejmou
 // @match        https://www.youtube.com/watch*
@@ -29,7 +29,7 @@ async function main() {
 
   // if we're here, need to select auto translate and open settings menu once more to reach the automatic subtitle selection
   getElementByXpath(
-    "//*[contains(@class, 'ytp-menuitem-label')][contains(text(),'Auto')]"
+    "//*[contains(@class, 'ytp-menuitem-label')][contains(text(),'auto')]"
   ).click();
   document.querySelector(settingsButtonSelector).click();
 
