@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube subtitle selector
 // @namespace    http://tampermonkey.net/
-// @version      0.3.2
+// @version      0.3.3
 // @description  Set YouTube subtitles to English automatically
 // @author       Sejmou
 // @match        https://www.youtube.com/watch*
@@ -11,6 +11,7 @@
 // @grant        none
 // ==/UserScript==
 async function main() {
+  await sleep(200);
   if (!window.location.href.includes('/watch')) return;
   const subtitleOptionSelector =
     '.ytp-menuitem:nth-of-type(3) .ytp-menuitem-content';
@@ -38,8 +39,14 @@ async function main() {
   document.querySelector('[role="menuitemradio"]:nth-of-type(3)').click();
   document.querySelector('[role="menuitemradio"]:nth-of-type(27)').click(); // 27th entry is English
   document.querySelector(settingsButtonSelector).click();
-  document.querySelector('.ytp-subtitles-button').click();
-  document.querySelector('.ytp-subtitles-button').click();
+
+  setTimeout(() => {
+    if (document.querySelector('.ytp-popup')) {
+      document.querySelector(settingsButtonSelector).click();
+    } else {
+      alert();
+    }
+  }, 500);
 }
 
 function dispatchKeyboardEvent(kbEvtInit) {
@@ -65,4 +72,14 @@ function getElementByXpath(path) {
   ).singleNodeValue;
 }
 
-setTimeout(main, 2000);
+let lastHref = document.location.href;
+const body = document.querySelector('body');
+const observer = new MutationObserver(mutations => {
+  mutations.forEach(() => {
+    if (lastHref !== document.location.href) {
+      lastHref = document.location.href;
+      main();
+    }
+  });
+});
+observer.observe(body, { childList: true, subtree: true });
